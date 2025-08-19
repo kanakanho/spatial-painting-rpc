@@ -95,24 +95,24 @@ class AdvancedColorPalletModel {
     let material = PhysicsMaterialResource.generate(friction: 0.8, restitution: 0.0)
     
     var activeColor = SimpleMaterial.Color.white
-
+    
     var colorBalls: [ColorBall] = []
-
+    
     let localOrigin: SIMD3<Float> = SIMD3(0, 0.21, 0)
-
+    
     var colorDictionary = [String: UIColor]()
     var colorEntityDictionary = [String: Entity]()
     var colorPanelEntityDictionary = [String: Entity]()
-
+    
     var toolBalls: [ToolBall] = []
     var toolEntityDictionary = [String: Entity]()
-
+    
     var selectedBasicColorName = ""
-
+    
     var selectedToolName = ""
-
+    
     let colorPanelNames: [String] = ["RedColors", "OrangeColors", "YellowColors", "GreenColors", "CyanColors", "BlueColors", "VioletColors", "PinkColors"]
-
+    
     // Hue マッピング (度数法)
     let hueDegreesMap: [Character: Int] = [
         "r":   0,
@@ -124,19 +124,19 @@ class AdvancedColorPalletModel {
         "v": 270,
         "p": 320
     ]
-
+    
     // Brightness マッピング (%)
     let brightnessMap: [Int: Int] = [
         1: 100, 2:  90, 3:  75,
         4:  60, 5:  45, 6:  30
     ]
-
+    
     // Saturation マッピング (%)
     let saturationMap: [Int: Int] = [
         1:  10, 2:  20, 3:  40,
         4:  60, 5:  80, 6: 100
     ]
-
+    
     //let colors: [SimpleMaterial.Color] = []
     //let colorNames: [String] = []
     
@@ -160,7 +160,7 @@ class AdvancedColorPalletModel {
             ColorBall(id: "m6", hue: 0, saturation: 0, brightness: 0, alpha: 100, position: SIMD3(0, -0.15, 0), isBasic: false)
         ]
         self.colorBalls = initialColorBalls
-
+        
         let initialToolBalls = [
             ToolBall(id: "eraser", lineWidth: 0.01, position: SIMD3(0, 0.15, 0), isEraser: true),
             ToolBall(id: "size_1", lineWidth: 0.003, position: SIMD3(0, 0.09, 0), isEraser: false),
@@ -170,7 +170,7 @@ class AdvancedColorPalletModel {
             ToolBall(id: "size_5", lineWidth: 0.03, position: SIMD3(0, -0.15, 0), isEraser: false)
         ]
         self.toolBalls = initialToolBalls
-
+        
         for char in hueDegreesMap.keys {
             for bint in brightnessMap.keys {
                 for sint in saturationMap.keys {
@@ -186,13 +186,12 @@ class AdvancedColorPalletModel {
         sceneEntity = scene
         isSoundEnabled = loadSound()
         isSoundEnabled2 = loadSound2()
-
+        
         if let entity = sceneEntity?.findEntity(named: "BasicColors") {
             let basicBalls = colorBalls.filter { $0.isBasic }
             for index in 0..<basicBalls.count {
                 let cb = basicBalls[index]
                 if let colorEntity = entity.findEntity(named: cb.id) {
-                    //basicColorEntities.append(colorEntity)
                     let c = UIColor(hue: CGFloat(cb.hue) / 360.0, saturation: CGFloat(cb.saturation) / 100.0, brightness: CGFloat(cb.brightness) / 100.0, alpha: CGFloat(cb.alpha) / 100.0)
                     var activeColor: UIColor!
                     if let p3Color = convertP3(srgbColor: c) {
@@ -203,13 +202,10 @@ class AdvancedColorPalletModel {
                     colorDictionary[cb.id] = activeColor
                     colorEntityDictionary[cb.id] = colorEntity
                 }
-                //let colorPanelEntity = Entity()
-                //colorPanelEntityDictionary[cb.id] = colorPanelEntity
-                //colorPalletEntity.addChild(colorPanelEntity)
             }
             print("basic color ball count = \(basicBalls.count)")
         }
-
+        
         for colorPanelName in colorPanelNames {
             if let entity = sceneEntity?.findEntity(named: colorPanelName) {
                 for i in colorBalls.indices {
@@ -230,14 +226,14 @@ class AdvancedColorPalletModel {
                         }
                         colorDictionary[ball.id] = activeColor
                         colorEntityDictionary[ball.id] = colorEntity
-
+                        
                         ball.position = colorEntity.position
                         colorBalls[i] = ball
                     }
                 }
             }
         }
-
+        
         if let entity = sceneEntity?.findEntity(named: "Grayscale") {
             let grayscaleBalls = colorBalls.filterByID(containing: "m", isBasic: false)
             for index in 0..<grayscaleBalls.count {
@@ -251,7 +247,7 @@ class AdvancedColorPalletModel {
             }
             print("grayscale color ball count = \(grayscaleBalls.count)")
         }
-
+        
         if let entity = sceneEntity?.findEntity(named: "LineWidth") {
             for index in 0..<toolBalls.count {
                 let tb = toolBalls[index]
@@ -270,7 +266,7 @@ class AdvancedColorPalletModel {
     func colorNames() -> [String] {
         return Array(colorDictionary.keys)
     }
-
+    
     func toolNames() -> [String] {
         return toolEntityDictionary.keys.filter { $0 != "eraser" }
     }
@@ -284,7 +280,7 @@ class AdvancedColorPalletModel {
         
         return UIColor(cgColor: converted)
     }
-
+    
     func updatePosition(position: SIMD3<Float>, wristPosition: SIMD3<Float>) {
         // 1) 手から手首への水平ベクトル
         let toWrist = normalize(simd_make_float3(
@@ -297,30 +293,23 @@ class AdvancedColorPalletModel {
         let dx = toWrist.x
         let dz = toWrist.z
         let yaw = atan2(dx, dz)
-
+        
         var grayscalePosition: SIMD3<Float> = localOrigin
         var toolPosition: SIMD3<Float> = localOrigin
-
+        
         let basicBalls = colorBalls.filter { $0.isBasic }
         for (index, colorBall) in zip(basicBalls.indices, basicBalls) {
             let entity: Entity = colorEntityDictionary[colorBall.id]!
-
+            
             // 回転後オフセット
             let xRot: Float = colorBall.position.x * cos(yaw) - colorBall.position.z * sin(yaw)
             let zRot: Float = colorBall.position.x * sin(yaw) + colorBall.position.z * cos(yaw)
             let yPos: Float = colorBall.position.y + centerHeight
-
+            
             let rotatedOffset = SIMD3<Float>(xRot, yPos, zRot)
-
+            
             let newPosition: SIMD3<Float> = position + rotatedOffset
             entity.setPosition(newPosition, relativeTo: nil)
-
-            /*
-            entity.setScale(SIMD3<Float>(repeating: 0.01), relativeTo: nil)
-            if colorBall.isSelected {
-                entity.setScale(SIMD3<Float>(repeating: 0.013), relativeTo: nil)
-            }
-            */
             
             if index == 0 {
                 grayscalePosition += newPosition
@@ -328,68 +317,38 @@ class AdvancedColorPalletModel {
                 toolPosition += newPosition
             }
         }
-
+        
         let grayscaleBalls = colorBalls.filter { !$0.isBasic }
         for colorBall in grayscaleBalls {
             let entity: Entity = colorEntityDictionary[colorBall.id]!
             entity.setPosition(grayscalePosition + colorBall.position, relativeTo: nil)
         }
-
+        
         for toolBall in toolBalls {
             let entity: Entity = toolEntityDictionary[toolBall.id]!
             entity.setPosition(toolPosition + toolBall.position, relativeTo: nil)
         }
-        /*
-        for (index,color) in zip(colors.indices, colors) {
-            let radians: Float = Float.pi / 180.0 * 360.0 / Float(colors.count) * Float(index)
-            var ballPosition: SIMD3<Float> = SIMD3<Float>(0.0, 0.0, 0.0)
-            
-            let rotatedOffset = SIMD3<Float>(
-                radius * sin(radians) * cos(yaw) - 0 * sin(yaw),
-                radius * cos(radians) + centerHeight,
-                radius * sin(radians) * sin(yaw) + 0 * cos(yaw)
-            )
-            
-            if index == 0 || index == Int(colors.count / 2) {
-                ballPosition = position + SIMD3<Float>(radius * sin(radians), radius * cos(radians) + centerHeight, 0.0)
-            } else {
-                //ballPosition = position + SIMD3<Float>(radius * sin(radians) * cos(angle), radius * cos(radians) + centerHeight, radius * sin(radians) * sin(angle))
-                ballPosition = position + rotatedOffset
-            }
-            
-            //colorPalletEntity.findEntity(named: color.accessibilityName)?.setPosition(ballPosition, relativeTo: nil)
-            let words = color.accessibilityName.split(separator: " ")
-            if let name = words.last, let entity = colorPalletEntity.findEntity(named: String(name)) {
-                entity.setPosition(ballPosition, relativeTo: nil)
-            }
-        }
-        
-        if let entity = colorPalletEntity.findEntity(named: "clear") {
-            let spherePosition: SIMD3<Float> = position + SIMD3<Float>(0, centerHeight, 0)
-            entity.setPosition(spherePosition, relativeTo: nil)
-        }
-        */
     }
     
     func updatePosition2(position: SIMD3<Float>, unitVector: SIMD3<Float>) {
         var grayscalePosition: SIMD3<Float> = localOrigin
         var toolPosition: SIMD3<Float> = localOrigin
         let colorPosition: SIMD3<Float> = localOrigin + position
-
+        
         let basicBalls = colorBalls.filter { $0.isBasic }
         for (index, colorBall) in zip(basicBalls.indices, basicBalls) {
             let entity: Entity = colorEntityDictionary[colorBall.id]!
-
+            
             // オフセット
             let xOff: Float = 0
             let zOff: Float = 0
             let yOff: Float = centerHeight
-
+            
             let offset = SIMD3<Float>(xOff, yOff, zOff)
-
+            
             let newPosition: SIMD3<Float> = calculateExtendedPoint(point: position + offset, vector: unitVector, distance: colorBall.position.x)
             entity.setPosition(newPosition, relativeTo: nil)
-
+            
             if index == 0 {
                 grayscalePosition += newPosition
             } else if index == basicBalls.count - 1 {
@@ -409,21 +368,21 @@ class AdvancedColorPalletModel {
                 //colorPalletEntity.addChild(colorPanelEntityDictionary[colorBall.id]!)
             }
         }
-
+        
         let grayscaleBalls = colorBalls.filterByID(containing: "m", isBasic: false)
         for colorBall in grayscaleBalls {
             if let entity: Entity = colorEntityDictionary[colorBall.id] {
                 entity.setPosition(grayscalePosition + colorBall.position, relativeTo: nil)
             }
         }
-
+        
         for toolBall in toolBalls {
             if let entity: Entity = toolEntityDictionary[toolBall.id] {
                 entity.setPosition(toolPosition + toolBall.position, relativeTo: nil)
             }
         }
     }
-
+    
     // 点から単位ベクトル方向にある、その点から一定距離分離れた位置の点を計算する関数
     func calculateExtendedPoint(point: SIMD3<Float>, vector: SIMD3<Float>, distance: Float) -> SIMD3<Float> {
         // 単位ベクトルにスカラー量（距離）を掛けて延長方向のベクトルを計算
@@ -434,7 +393,7 @@ class AdvancedColorPalletModel {
         
         return extendedPoint
     }
-
+    
     func initEntity() {
         for colorBall in colorBalls {
             if let entity: Entity = colorEntityDictionary[colorBall.id] {
@@ -448,19 +407,6 @@ class AdvancedColorPalletModel {
                 colorPalletEntity.addChild(entity)
             }
         }
-        /*
-        for (index,color) in zip(colors.indices, colors) {
-            let deg = 360.0 / Float(colors.count) * Float(index)
-            let radians: Float = Float.pi / 180.0 * deg
-            //print("💥 Color accessibilityName \(index): \(color.accessibilityName)")
-            createColorBall(color: color, radians: radians, radius: radius, parentPosition: colorPalletEntity.position)
-        }
-        if let entity = sceneEntity?.findEntity(named: "clear") {
-            let position: SIMD3<Float> = SIMD3(0, centerHeight, 0)
-            entity.setPosition(position, relativeTo: nil)
-            colorPalletEntity.addChild(entity)
-        }
-        */
     }
     
     func createColorBall(color: SimpleMaterial.Color, radians: Float, radius: Float, parentPosition: SIMD3<Float>) {

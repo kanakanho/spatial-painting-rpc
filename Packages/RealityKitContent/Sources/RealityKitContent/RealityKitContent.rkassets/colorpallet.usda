@@ -12,7 +12,7 @@ def Xform "Root"
 {
     def "BasicColors" (
         active = true
-        prepend references = @BasicColors.usdz@
+        references = @BasicColors.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -235,7 +235,7 @@ def Xform "Root"
 
     def "Grayscale" (
         active = true
-        prepend references = @Grayscale.usdz@
+        references = @Grayscale.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -404,7 +404,7 @@ def Xform "Root"
 
     def "LineWidth" (
         active = true
-        prepend references = @LineWidth.usdz@
+        references = @LineWidth.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -649,124 +649,9 @@ def Xform "Root"
         }
     }
 
-    def "button" (
-        active = true
-        prepend apiSchemas = ["MaterialBindingAPI"]
-        references = @button.usdz@
-    )
-    {
-        reorder nameChildren = ["button2", "Materials", "button", "InputTarget", "Collider"]
-        rel material:binding = </Root/button/Materials/mat1> (
-            bindMaterialAs = "weakerThanDescendants"
-        )
-        float2 ui:nodegraph:node:pos = (20, 20)
-        int ui:nodegraph:node:stackingOrder = 1
-        float3 xformOp:scale = (0.004, 0.004, 0.004)
-        float3 xformOp:translate = (0, 0, 0.12)
-        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
-
-        over "Materials"
-        {
-            over "mat1"
-            {
-                token outputs:mtlx:surface
-                token outputs:realitykit:vertex
-
-                over "mat1PreviewSurface"
-                {
-                    color3f inputs:diffuseColor = (0.7104854, 1, 0.75313324) (
-                        colorSpace = "srgb_displayp3"
-                    )
-                    float inputs:metallic = 0
-                    float inputs:roughness = 1
-                }
-            }
-        }
-
-        def RealityKitComponent "InputTarget"
-        {
-            uniform token info:id = "RealityKit.InputTarget"
-        }
-
-        def RealityKitComponent "Collider"
-        {
-            uint group = 1
-            uniform token info:id = "RealityKit.Collider"
-            uint mask = 4294967295
-            token type = "Default"
-
-            def RealityKitStruct "Shape"
-            {
-                float3 extent = (10, 5, 10)
-                token shapeType = "Box"
-
-                def RealityKitStruct "pose"
-                {
-                }
-            }
-        }
-    }
-
-    def "button2" (
-        active = true
-        prepend apiSchemas = ["MaterialBindingAPI"]
-        references = @button2.usdz@
-    )
-    {
-        rel material:binding = </Root/button/Materials/mat1> (
-            bindMaterialAs = "weakerThanDescendants"
-        )
-        float2 ui:nodegraph:node:pos = (20, 20)
-        int ui:nodegraph:node:stackingOrder = 1
-        quatf xformOp:orient = (1, 0, 0, 0)
-        float3 xformOp:scale = (0.004, 0.004, 0.004)
-        float3 xformOp:translate = (0, 0, 0.17)
-        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
-
-        over "Materials"
-        {
-            over "mat1"
-            {
-                token outputs:mtlx:surface
-                token outputs:realitykit:vertex
-
-                over "mat1PreviewSurface"
-                {
-                    color3f inputs:diffuseColor = (0.6443922, 0.8640054, 0.9063318) (
-                        colorSpace = "srgb_displayp3"
-                    )
-                    float inputs:roughness = 1
-                }
-            }
-        }
-
-        def RealityKitComponent "InputTarget"
-        {
-            uniform token info:id = "RealityKit.InputTarget"
-        }
-
-        def RealityKitComponent "Collider"
-        {
-            uint group = 1
-            uniform token info:id = "RealityKit.Collider"
-            uint mask = 4294967295
-            token type = "Default"
-
-            def RealityKitStruct "Shape"
-            {
-                float3 extent = (10, 5, 10)
-                token shapeType = "Box"
-
-                def RealityKitStruct "pose"
-                {
-                }
-            }
-        }
-    }
-
     def "RedColors" (
         active = true
-        prepend references = @RedColors.usdz@
+        references = @RedColors.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -1715,7 +1600,7 @@ def Xform "Root"
 
     def "OrangeColors" (
         active = true
-        prepend references = @OrangeColors.usdz@
+        references = @OrangeColors.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -2664,7 +2549,7 @@ def Xform "Root"
 
     def "YellowColors" (
         active = true
-        prepend references = @YellowColors.usdz@
+        references = @YellowColors.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -3613,7 +3498,7 @@ def Xform "Root"
 
     def "GreenColors" (
         active = true
-        prepend references = @GreenColors.usdz@
+        references = @GreenColors.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -4562,7 +4447,7 @@ def Xform "Root"
 
     def "CyanColors" (
         active = true
-        prepend references = @CyanColors.usdz@
+        references = @CyanColors.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -5511,7 +5396,7 @@ def Xform "Root"
 
     def "BlueColors" (
         active = true
-        prepend references = @BlueColors.usdz@
+        references = @BlueColors.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -6460,7 +6345,7 @@ def Xform "Root"
 
     def "VioletColors" (
         active = true
-        prepend references = @VioletColors.usdz@
+        references = @VioletColors.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -7409,7 +7294,7 @@ def Xform "Root"
 
     def "PinkColors" (
         active = true
-        prepend references = @PinkColors.usdz@
+        references = @PinkColors.usdz@
     )
     {
         float3 xformOp:scale = (1, 1, 1)
@@ -8352,6 +8237,134 @@ def Xform "Root"
                         }
                     }
                 }
+            }
+        }
+    }
+
+    def "board" (
+        active = true
+        customData = {
+            float3 rotationEulerHint = (0, 0, 0)
+        }
+        references = @board.usdz@
+    )
+    {
+        reorder nameChildren = ["button", "button2", "board", "color_board"]
+        quatf xformOp:orient = (1, 0, 0, 0)
+        float3 xformOp:scale = (1, 1, 1)
+        float3 xformOp:translate = (0, 0, 0.15)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def "button" (
+            active = true
+            references = @button.usdz@
+        )
+        {
+            reorder nameChildren = ["button2", "save", "button", "color_button"]
+            float3 xformOp:scale = (1, 1, 1)
+            float3 xformOp:translate = (0, 0.006, 0.025)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+            def "save" (
+                active = true
+                customData = {
+                    float3 rotationEulerHint = (0, 0, 0)
+                }
+                references = @save.usdz@
+            )
+            {
+                quatf xformOp:orient = (1, 0, 0, 0)
+                float3 xformOp:scale = (1, 1, 1)
+                float3 xformOp:translate = (0, 0.004, 0)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+            }
+
+            def RealityKitComponent "InputTarget"
+            {
+                uniform token info:id = "RealityKit.InputTarget"
+            }
+
+            def RealityKitComponent "Collider"
+            {
+                uint group = 1
+                uniform token info:id = "RealityKit.Collider"
+                uint mask = 4294967295
+                token type = "Default"
+
+                def RealityKitStruct "Shape"
+                {
+                    float3 extent = (0.040000003, 0.013650002, 0.04)
+                    token shapeType = "Box"
+
+                    def RealityKitStruct "pose"
+                    {
+                        float3 position = (0, 0.0018249999, 0)
+                    }
+                }
+            }
+        }
+
+        def "button2" (
+            active = true
+            references = @button2.usdz@
+        )
+        {
+            reorder nameChildren = ["import_loupe", "import_film", "button", "color_button", "InputTarget", "Collider"]
+            quatf xformOp:orient = (1, 0, 0, 0)
+            float3 xformOp:scale = (1, 1, 1)
+            float3 xformOp:translate = (0, 0.006, -0.025)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+            def RealityKitComponent "InputTarget"
+            {
+                uniform token info:id = "RealityKit.InputTarget"
+            }
+
+            def RealityKitComponent "Collider"
+            {
+                uint group = 1
+                uniform token info:id = "RealityKit.Collider"
+                uint mask = 4294967295
+                token type = "Default"
+
+                def RealityKitStruct "Shape"
+                {
+                    float3 extent = (0.040000003, 0.010000003, 0.04)
+                    token shapeType = "Box"
+
+                    def RealityKitStruct "pose"
+                    {
+                    }
+                }
+            }
+
+            def "import_film" (
+                active = true
+                customData = {
+                    float3 rotationEulerHint = (0, 0, 0)
+                }
+                references = @import_film.usdz@
+            )
+            {
+                reorder nameChildren = ["import_loupe", "import_film", "color_icon_1", "color_icon_2", "color_icon_3", "color_button", "color_board"]
+                quatf xformOp:orient = (1, 0, 0, 0)
+                float3 xformOp:scale = (1, 1, 1)
+                float3 xformOp:translate = (0, 0.0055, 0)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+            }
+
+            def "import_loupe" (
+                active = true
+                customData = {
+                    float3 rotationEulerHint = (0, 0, 0)
+                }
+                references = @import_loupe.usdz@
+            )
+            {
+                quatf xformOp:orient = (1, 0, 0, 0)
+                float3 xformOp:scale = (1, 1, 1)
+                float3 xformOp:translate = (0, 0.0065, 0)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
             }
         }
     }

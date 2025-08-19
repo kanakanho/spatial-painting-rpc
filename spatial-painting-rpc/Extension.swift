@@ -161,3 +161,10 @@ extension [[Float]] {
         return self.map { $0.map { Double($0) } }
     }
 }
+
+extension Array where Element == Stroke {
+    /// point が count 以下のストロークを取り除いた配列を返す
+    func removingShortStrokes(minPoints: Int = 3) -> [Stroke] {
+        return self.filter { $0.points.count >= minPoints }
+    }
+}

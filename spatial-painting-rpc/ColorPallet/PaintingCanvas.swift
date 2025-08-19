@@ -151,7 +151,9 @@ class PaintingCanvas {
         if let stroke = currentStroke {
             //print("finish stroke")
             // Trigger the update mesh operation.
-            if stroke.points.count < 2 {
+            if stroke.points.count < 4 {
+                strokes.removeAll { $0.uuid == stroke.uuid }
+                stroke.entity.removeFromParent()
                 currentStroke = nil
                 return
             }
@@ -162,8 +164,9 @@ class PaintingCanvas {
                 if count % 5 == 0 {
                     let entity = eraserEntity.clone(recursive: true)
                     entity.name = "clear"
-                    let material = SimpleMaterial(color: UIColor(white: 1.0, alpha: 0.0), isMetallic: false)
-                    entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [material]))
+                    var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
+                    invisibleMaterial.opacityThreshold = 1.0
+                    entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
                     entity.components.set(StrokeComponent(stroke.uuid))
                     entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
                     entity.position = point
@@ -195,8 +198,9 @@ class PaintingCanvas {
             if count % 5 == 0 {
                 let entity = eraserEntity.clone(recursive: true)
                 entity.name = "clear"
-                let material = SimpleMaterial(color: UIColor(white: 1.0, alpha: 0.0), isMetallic: false)
-                entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [material]))
+                var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
+                invisibleMaterial.opacityThreshold = 1.0
+                entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
                 entity.components.set(StrokeComponent(stroke.uuid))
                 entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
                 entity.position = point
@@ -205,7 +209,7 @@ class PaintingCanvas {
             count += 1
         }
         
-        self.strokes.append(newStroke)
+        strokes.append(newStroke)
         root.addChild(newStroke.entity)
     }
 }
@@ -272,17 +276,15 @@ extension PaintingCanvas {
     func confirmTmpStrokes() {
         if tmpStrokes.isEmpty { return }
         for stroke in tmpStrokes {
-            stroke.points = stroke.points.map {
-                let position = $0
-                // 位置を調整する
-                return SIMD3<Float>(stroke.entity.transformMatrix(relativeTo: nil) * SIMD4<Float>(position.x, position.y, position.z, 1.0))
+            stroke.points = stroke.points.map { (position: SIMD3<Float>) in
+                return SIMD3<Float>(stroke.entity.transformMatrix(relativeTo: nil) * SIMD4<Float>(position, 1.0))
             }
             let newStroke = Stroke(uuid: stroke.uuid, originalMaxRadius: stroke.originalMaxRadius)
             newStroke.maxRadius = stroke.maxRadius
             newStroke.setActiveColor(color: stroke.activeColor)
             newStroke.points = stroke.points
             newStroke.updateMesh()
-            self.strokes.append(newStroke)
+            strokes.append(newStroke)
             root.addChild(newStroke.entity)
             
             var count = 0
@@ -290,8 +292,9 @@ extension PaintingCanvas {
                 if count % 5 == 0 {
                     let entity = eraserEntity.clone(recursive: true)
                     entity.name = "clear"
-                    let material = SimpleMaterial(color: UIColor(white: 1.0, alpha: 0.0), isMetallic: false)
-                    entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [material]))
+                    var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
+                    invisibleMaterial.opacityThreshold = 1.0
+                    entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
                     entity.components.set(StrokeComponent(stroke.uuid))
                     entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
                     entity.position = point
@@ -360,7 +363,7 @@ extension PaintingCanvas {
         }
     }
     
-    /// [ExternalStroke] 全体で最も端の位置を取得する
+    /// [Stroke] 全体で最も端の位置を取得する
     ///  - Returns: 最も端の位置（直方体の8頂点）
     private func generateBoundingBox() {
         guard !self.tmpStrokes.isEmpty else { return }

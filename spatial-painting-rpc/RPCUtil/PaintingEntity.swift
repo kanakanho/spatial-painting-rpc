@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import RealityFoundation
+import RealityKit
 import UIKit
 
 @MainActor
@@ -20,6 +20,49 @@ class Painting:ObservableObject {
         if let color: UIColor = advancedColorPalletModel.colorDictionary[param.strokeColorName] {
             advancedColorPalletModel.colorPalletEntityDisable()
             advancedColorPalletModel.setActiveColor(color: color)
+            paintingCanvas.setActiveColor(color: color)
+        }
+        
+        if advancedColorPalletModel.selectedBasicColorName == param.strokeColorName {
+            return
+        }
+        let colorBall = advancedColorPalletModel.colorBalls.get(withID: param.strokeColorName)
+        if colorBall == nil {
+            return
+        }
+        let prev = advancedColorPalletModel.selectedBasicColorName
+        if prev != "" {
+            if colorBall!.isBasic || param.strokeColorName.hasPrefix("m") {
+                if let prevEntity = advancedColorPalletModel.colorEntityDictionary[prev] {
+                    prevEntity.setScale(SIMD3<Float>(repeating: 0.01), relativeTo: nil)
+                    let colorBall2 = advancedColorPalletModel.colorBalls.get(withID: prev)
+                    if colorBall2 != nil {
+                        //print("Unselected color ball: \(colorBall2!.id)")
+                        let subColorBalls = advancedColorPalletModel.colorBalls.filterByID(containing: String(prev.prefix(1)), isBasic: false)
+                        for cb in subColorBalls {
+                            if let entity2: Entity = advancedColorPalletModel.colorEntityDictionary[cb.id] {
+                                entity2.removeFromParent()
+                            }
+                        }
+                    }
+                }
+                advancedColorPalletModel.selectedBasicColorName = ""
+            }
+        }
+        if let color: UIColor = advancedColorPalletModel.colorDictionary[param.strokeColorName] {
+            if let colorEntity = advancedColorPalletModel.colorEntityDictionary[param.strokeColorName] {
+                if colorBall!.isBasic {
+                    colorEntity.setScale(SIMD3<Float>(repeating: 0.013), relativeTo: nil)
+                    let subColorBalls = advancedColorPalletModel.colorBalls.filterByID(containing: String(param.strokeColorName.prefix(1)), isBasic: false)
+                    for cb in subColorBalls {
+                        if let entity2: Entity =
+                            advancedColorPalletModel.colorEntityDictionary[cb.id] {
+                            advancedColorPalletModel.colorPalletEntity.addChild(entity2)
+                        }
+                    }
+                    advancedColorPalletModel.selectedBasicColorName = param.strokeColorName
+                }
+            }
         }
     }
     
@@ -59,7 +102,7 @@ class Painting:ObservableObject {
     
     /// 複数のストロークを追加する
     func addStrokes(param: AddStrokesParam) {
-        paintingCanvas.addStrokes(param.externalStrokes.strokes())
+        paintingCanvas.addStrokes(param.strokes)
     }
     
     /// 追加したストロークを確定する
@@ -73,11 +116,11 @@ class Painting:ObservableObject {
         if advancedColorPalletModel.selectedToolName == param.toolName {
             return
         }
-//        let toolBall = advancedColorPalletModel.toolBalls.get(withID: param.toolName)
-//        if toolBall == nil {
-//            
-//        }
         advancedColorPalletModel.selectedToolName = param.toolName
+        if let lineWidth = advancedColorPalletModel.toolBalls.get(withID: param.toolName)?.lineWidth {
+            advancedColorPalletModel.colorPalletEntityDisable()
+            paintingCanvas.setMaxRadius(radius: Float(lineWidth))
+        }
     }
 }
 
@@ -120,7 +163,7 @@ struct PaintingEntity: RPCEntity {
         }
         
         struct AddStrokesParam: Codable {
-            let externalStrokes: [ExternalStroke]
+            let strokes: [Stroke]
         }
         
         struct FinishStrokeParam: Codable {
@@ -131,7 +174,7 @@ struct PaintingEntity: RPCEntity {
         }
         
         struct ConfirmTmpStrokesParam: Codable {
-            let externalStrokes: [ExternalStroke]
+            let strokes: [Stroke]
         }
         
         func encode(to encoder: Encoder) throws {

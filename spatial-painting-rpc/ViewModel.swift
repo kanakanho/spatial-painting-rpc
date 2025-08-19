@@ -17,7 +17,6 @@ class ViewModel {
     var session = ARKitSession()
     var handTracking = HandTrackingProvider()
     var sceneReconstruction = SceneReconstructionProvider()
-    var worldTracking = WorldTrackingProvider()
     
     private var meshEntities = [UUID: ModelEntity]()
     var contentEntity = Entity()
@@ -28,8 +27,6 @@ class ViewModel {
     
     var latestRightIndexFingerCoordinates: simd_float4x4 = .init()
     var latestLeftIndexFingerCoordinates: simd_float4x4 = .init()
-    
-    var latestWorldTracking: WorldAnchor = .init(originFromAnchorTransform: .init())
     
     var isGlab: Bool = false
     
@@ -56,8 +53,6 @@ class ViewModel {
         var right: HandAnchor?
     }
     
-    var errorState = false
-    
     // ストロークを消去する時の長押し時間 added by nagao 2025/3/24
     var clearTime: Int = 0
     
@@ -70,8 +65,16 @@ class ViewModel {
     var handArrowEntities: [Entity] = []
     
     var buttonEntity: Entity = Entity()
-        
+    
+    var iconEntity: Entity = Entity()
+    
     var buttonEntity2: Entity = Entity()
+    
+    var iconEntity2: Entity = Entity()
+    
+    var iconEntity3: Entity = Entity()
+    
+    var buttonPlateEntity: Entity = Entity()
     
     var axisVectors: [SIMD3<Float>] = [SIMD3<Float>(0,0,0), SIMD3<Float>(0,0,0), SIMD3<Float>(0,0,0)]
     
@@ -93,6 +96,26 @@ class ViewModel {
     
     func setButtonEntity2(_ entity: Entity) {
         self.buttonEntity2 = entity
+    }
+    
+    func setButtonPlateEntity(_ entity: Entity) {
+        //print("Set buttonPlateEntity")
+        self.buttonPlateEntity = entity
+        if let button = entity.findEntity(named: "button") {
+            buttonEntity = button
+            if let icon = button.findEntity(named: "save") {
+                iconEntity = icon
+            }
+        }
+        if let button = entity.findEntity(named: "button2") {
+            buttonEntity2 = button
+            if let icon2 = button.findEntity(named: "import_loupe") {
+                iconEntity2 = icon2
+            }
+            if let icon3 = button.findEntity(named: "import_film") {
+                iconEntity3 = icon3
+            }
+        }
     }
     
     func showHandArrowEntities() {
@@ -130,8 +153,7 @@ class ViewModel {
         handSphereEntity = nil
         colorPalletModel.colorPalletEntityDisable()
         
-        buttonEntity.removeFromParent()
-        buttonEntity2.removeFromParent()
+        buttonPlateEntity.removeFromParent()
     }
     
     let fingerEntities: [HandAnchor.Chirality: ModelEntity] = [/*.left: .createFingertip(name: "L", color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 1.0)),*/ .right: .createFingertip(name: "R", color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 1.0))]
@@ -231,7 +253,21 @@ class ViewModel {
             }
         }
     }
-
+    
+    func changeFingerLineWidth(entity: Entity, toolName: String) {
+        //print("Finger line width changed to: \(toolName)")
+        if colorPalletModel.selectedToolName == toolName {
+            return
+        }
+        let toolBall = colorPalletModel.toolBalls.get(withID: toolName)
+        if toolBall != nil {
+            let material = SimpleMaterial(color: colorPalletModel.activeColor, isMetallic: false)
+            entity.components.set(ModelComponent(mesh: .generateSphere(radius: Float(toolBall!.lineWidth)), materials: [material]))
+            //print("Selected tool ball: \(toolBall!.id)  \(toolBall!.lineWidth)  \(toolBall!.isSelected)")
+        }
+        colorPalletModel.selectedToolName = toolName
+    }
+    
     // added by nagao 2025/7/17
     func resetColor() {
         if colorPalletModel.selectedBasicColorName == "" {
@@ -255,7 +291,7 @@ class ViewModel {
         }
         colorPalletModel.selectedBasicColorName = ""
     }
-
+    
     // added by nagao 2025/7/17
     func changeFingerLineWidth(entity: Entity, toolName: String, activeColor: UIColor) {
         //print("Finger line width changed to: \(toolName)")
@@ -270,7 +306,7 @@ class ViewModel {
         }
         colorPalletModel.selectedToolName = toolName
     }
-
+    
     
     func processReconstructionUpdates() async {
         for await update in sceneReconstruction.anchorUpdates {
@@ -296,40 +332,6 @@ class ViewModel {
             case .removed:
                 meshEntities[meshAnchor.id]?.removeFromParent()
                 meshEntities.removeValue(forKey: meshAnchor.id)
-            }
-        }
-    }
-    
-    func monitorSessionEvents() async {
-        for await event in session.events {
-            switch event {
-            case .authorizationChanged(type: _, status: let status):
-                print("Authorization changed to: \(status)")
-                
-                if status == .denied {
-                    errorState = true
-                }
-            case .dataProviderStateChanged(dataProviders: let providers, newState: let state, error: let error):
-                print("Data provider changed: \(providers), \(state)")
-                if let error {
-                    print("Data provider reached an error state: \(error)")
-                    errorState = true
-                }
-            @unknown default:
-                fatalError("Unhandled new event type \(event)")
-            }
-        }
-    }
-    
-    func processWorldUpdates() async {
-        for await update in worldTracking.anchorUpdates {
-            switch update.event {
-            case .updated:
-                let anchor = update.anchor
-                latestWorldTracking = anchor
-                print(latestWorldTracking.originFromAnchorTransform.position)
-            default:
-                break
             }
         }
     }
@@ -380,9 +382,6 @@ class ViewModel {
         guard let rightHandAnchor = latestHandTracking.right,
               let rightWristBase = rightHandAnchor.handSkeleton?.joint(.wrist)
         else { return }
-        
-        let button = buttonEntity
-        let button2 = buttonEntity2
         
         let middle: simd_float4x4 = handAnchor.originFromAnchorTransform * middleBase.anchorFromJointTransform
         let little: simd_float4x4 = handAnchor.originFromAnchorTransform * littleBase.anchorFromJointTransform
@@ -441,15 +440,15 @@ class ViewModel {
         let worldUp = simd_float3(0, 1, 0)
         let dot = simd_dot(normalVector, worldUp)
         if dot > senseThreshold {
-            let point = calculateExtendedPoint(point: planePoint, vector: normalVector, distance: 0.07)
-            button.setPosition(point, relativeTo: nil)
-            contentEntity.addChild(button)
-            let point2 = calculateExtendedPoint(point: point, vector: planeNormalVector, distance: 0.05)
-            button2.setPosition(point2, relativeTo: nil)
-            contentEntity.addChild(button2)
+            let point = calculateExtendedPoint(point: planePoint, vector: normalVector, distance: 0.05)
+            let matrix = makeBoxTransformMatrix(center: point, longAxis: planeNormalVector, size: SIMD3<Float>(2.5, 2.5, 2.5))
+            buttonPlateEntity.setTransformMatrix(matrix, relativeTo: nil)
+            let isButtonExist = contentEntity.children.contains { $0 === buttonPlateEntity }
+            if !isButtonExist {
+                contentEntity.addChild(buttonPlateEntity)
+            }
         } else {
-            button.removeFromParent()
-            button2.removeFromParent()
+            buttonPlateEntity.removeFromParent()
         }
         
         // ワールドの下方向ベクトル
@@ -474,9 +473,9 @@ class ViewModel {
             colorPalletModel.colorPalletEntityEnabled()
         }
         
-//        colorPalletModel.updatePosition(position: positionMatrix.position, wristPosition: wristPos)
+        //        colorPalletModel.updatePosition(position: positionMatrix.position, wristPosition: wristPos)
         colorPalletModel.updatePosition2(position: positionMatrix.position, unitVector: unitVector)
-
+        
     }
     
     func createHandSphere(wrist: SIMD3<Float>, middle: SIMD3<Float>, little: SIMD3<Float>, isArrowShown: Bool) {
@@ -576,6 +575,8 @@ class ViewModel {
         
         normalVector = currentNormalVector
         
+        planeNormalVector = currentAxisVector
+        
         unitVector = currentLittleVector
         
         planePoint = center
@@ -643,6 +644,60 @@ class ViewModel {
             // AとBが同じ方向を向いている場合、単位クォータニオンを返す
             return simd_quatf(angle: 0, axis: simd_float3(0, 1, 0))  // 回転不要
         }
+    }
+    
+    /// 中心 `center` と長辺方向ベクトル `longAxis`、そして box のサイズ `size`
+    /// (x: 短辺, y: 高さ, z: 長辺) から
+    /// 回転・スケール・平行移動を含む 4×4 ワールド変換行列を作成する
+    func makeBoxTransformMatrix(
+        center: SIMD3<Float>,
+        longAxis: SIMD3<Float>,
+        size: SIMD3<Float>
+    ) -> float4x4 {
+        // 1) 長辺方向を正規化してローカルZ軸に
+        let axisZ = normalize(longAxis)
+        
+        // 2) ワールド上方向を平面に投影してローカルX軸を作成
+        //    → まずワールド上方向ベクトル (0,1,0) と直交するベクトルを求める
+        let worldUp = SIMD3<Float>(0, 1, 0)
+        var axisX = cross(axisZ, worldUp)
+        if length_squared(axisX) < 1e-6 {
+            // axisZ と worldUp がほぼ平行なら別ベクトルを使う
+            axisX = cross(axisZ, SIMD3<Float>(1, 0, 0))
+        }
+        axisX = normalize(axisX)
+        
+        // 3) ローカル Y 軸は右手系で残りの軸として生成
+        let axisY = cross(axisX, axisZ)
+        
+        // 4) サイズの半分を軸ごとにスケール成分として利用
+        let halfSize = size * 0.5
+        let sx = halfSize.x, sy = halfSize.y, sz = halfSize.z
+        
+        // 5) 行列組み立て (列優先)
+        var m = matrix_identity_float4x4
+        // X 軸列
+        m.columns.0 = SIMD4<Float>(axisX.x * sx,
+                                   axisX.y * sx,
+                                   axisX.z * sx,
+                                   0)
+        // Y 軸列
+        m.columns.1 = SIMD4<Float>(axisY.x * sy,
+                                   axisY.y * sy,
+                                   axisY.z * sy,
+                                   0)
+        // Z 軸列
+        m.columns.2 = SIMD4<Float>(-axisZ.x * sz,
+                                   -axisZ.y * sz,
+                                   -axisZ.z * sz,
+                                   0)
+        // 平行移動列
+        m.columns.3 = SIMD4<Float>(center.x,
+                                   center.y,
+                                   center.z,
+                                   1)
+        
+        return m
     }
     
     // 点から単位ベクトル方向にある、その点から一定距離分離れた位置の点を計算する関数

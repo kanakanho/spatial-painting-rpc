@@ -18,7 +18,7 @@ struct StrokeComponent: Component {
 }
 
 /// A structure to represent the stroke.
-class Stroke {
+class Stroke: Codable {
     var uuid: UUID
     
     var activeColor: SimpleMaterial.Color = SimpleMaterial.Color.red
@@ -217,5 +217,66 @@ class Stroke {
         // Add the contents of the fourth, second, and first entry from the
         // `quadIndices` array to the `trinagles` collection.
         triangles.append(contentsOf: [quadIndices[3], quadIndices[1], quadIndices[0]])
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case points
+        case activeColor
+        case maxRadius
+    }
+    
+    // pointを変更しない
+    public init(uuid: UUID, points: [SIMD3<Float>] = [], color: SimpleMaterial.Color = .white, maxRadius: Float = 1E-2) {
+        self.uuid = uuid
+        self.points = points
+        self.activeColor = color
+        self.maxRadius = maxRadius
+        entity.components.set(StrokeComponent(uuid))
+    }
+    
+    public init(uuid: UUID, points: [SIMD3<Float>] = [], color: CGColor = .init(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), maxRadius: Float = 1E-2) {
+        self.uuid = uuid
+        self.points = points
+        self.activeColor = .init(cgColor: color)
+        self.maxRadius = maxRadius
+        entity.components.set(StrokeComponent(uuid))
+    }
+    
+    required public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let pointArrays = try container.decode([[Float]].self, forKey: .points)
+        self.points = pointArrays.map { SIMD3<Float>($0) }
+        
+        // maxRadius の有無を確認
+        let hasMaxRadius = container.contains(.maxRadius)
+        let colorArray = try container.decode([Float].self, forKey: .activeColor)
+        guard colorArray.count == 4 else {
+            throw DecodingError.dataCorruptedError(forKey: .activeColor, in: container, debugDescription: "Color array must have 4 elements")
+        }
+        
+        if hasMaxRadius {
+            // HSVA（Hue, Saturation, Value, Alpha）
+            self.activeColor = .init(hue: CGFloat(colorArray[0]), saturation: CGFloat(colorArray[1]), brightness: CGFloat(colorArray[2]), alpha: CGFloat(colorArray[3]))
+        } else {
+            // RGBA（Red, Green, Blue, Alpha）
+            self.activeColor = .init(red: CGFloat(colorArray[0]), green: CGFloat(colorArray[1]), blue: CGFloat(colorArray[2]), alpha: CGFloat(colorArray[3]))
+        }
+        
+        self.maxRadius = try container.decodeIfPresent(Float.self, forKey: .maxRadius) ?? 1E-2
+        self.uuid = UUID()
+        entity.components.set(StrokeComponent(uuid))
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        let pointArrays = points.map { [$0.x, $0.y, $0.z] }
+        try container.encode(pointArrays, forKey: .points)
+        var hue: CGFloat = 0.0
+        var saturation: CGFloat = 0.0
+        var brightness: CGFloat = 0.0
+        var alpha: CGFloat = 0.0
+        activeColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        try container.encode([hue, saturation, brightness, alpha], forKey: .activeColor)
+        try container.encode(maxRadius, forKey: .maxRadius)
     }
 }

@@ -624,7 +624,7 @@ def Xform "Root"
         references = @collider.usdz@
     )
     {
-        rel material:binding = </Root/collider/Materials/mat1> (
+        rel material:binding = </Root/collider/Materials/mat1_1> (
             bindMaterialAs = "weakerThanDescendants"
         )
         quatf xformOp:orient = (1, 0, 0, 0)
@@ -632,8 +632,14 @@ def Xform "Root"
         float3 xformOp:translate = (0, 0.8999998, -0.75)
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
 
-        over "Materials"
+        over "Materials" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
         {
+            rel material:binding = </Root/collider/Materials/mat1_1> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
+
             over "mat1"
             {
                 token outputs:mtlx:surface.connect = </Root/collider/Materials/mat1/PreviewSurface.outputs:out>
@@ -642,7 +648,7 @@ def Xform "Root"
                 float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (0, 110.5)
 
                 over "mat1PreviewSurface" (
-                    active = true
+                    active = false
                 )
                 {
                     float inputs:clearcoat = 0
@@ -660,12 +666,114 @@ def Xform "Root"
                 }
 
                 def Shader "PreviewSurface" (
-                    active = false
+                    active = true
                 )
                 {
                     uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
+                    float inputs:clearcoatRoughness = 0
+                    color3f inputs:diffuseColor = (1, 1, 1) (
+                        colorSpace = "lin_srgb"
+                    )
+                    color3f inputs:emissiveColor = (1, 1, 1) (
+                        colorSpace = "lin_srgb"
+                    )
+                    float inputs:ior = 0
+                    float3 inputs:normal = (0, 0, 0)
+                    float inputs:occlusion = 0
+                    float inputs:opacity = 0
+                    float inputs:opacityThreshold = 1
+                    float inputs:roughness = 0
                     token outputs:out
                     float2 ui:nodegraph:node:pos = (-255, 105)
+                    int ui:nodegraph:node:stackingOrder = 29
+                    string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["inputs:diffuseColor"]
+                }
+            }
+
+            over "defaultMaterial"
+            {
+                token outputs:mtlx:surface.connect = </Root/collider/Materials/defaultMaterial/PreviewSurface.outputs:out>
+                token outputs:realitykit:vertex
+                token outputs:surface.connect = </Root/collider/Materials/defaultMaterial/Shader.outputs:surface>
+                float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (0, 110.5)
+
+                over "Shader" (
+                    active = false
+                )
+                {
+                }
+
+                def Shader "PreviewSurface"
+                {
+                    uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
+                    float inputs:clearcoatRoughness = 0
+                    color3f inputs:diffuseColor = (1, 1, 1) (
+                        colorSpace = "lin_srgb"
+                    )
+                    color3f inputs:emissiveColor = (1, 1, 1) (
+                        colorSpace = "lin_srgb"
+                    )
+                    float inputs:ior = 0
+                    float3 inputs:normal = (0, 0, 0)
+                    float inputs:occlusion = 0
+                    float inputs:opacity = 0
+                    float inputs:opacityThreshold = 1
+                    float inputs:roughness = 0
+                    token outputs:out
+                    float2 ui:nodegraph:node:pos = (-255, 105)
+                    int ui:nodegraph:node:stackingOrder = 1
+                }
+            }
+
+            def Material "mat1_1" (
+                prepend references = </Root/collider/Materials/mat1>
+            )
+            {
+                token cullMode = "back" (
+                    allowedTokens = ["unspecified", "none", "front", "back"]
+                )
+                token outputs:displacement.connect = </Root/collider/Materials/mat1_1/mat1PreviewSurface.outputs:displacement>
+                token outputs:mtlx:surface.connect = </Root/collider/Materials/mat1_1/PreviewSurface.outputs:out>
+                token outputs:surface.connect = </Root/collider/Materials/mat1_1/mat1PreviewSurface.outputs:surface>
+                float2 ui:nodegraph:node:pos = (1032, 146.5)
+                int ui:nodegraph:node:stackingOrder = 1
+                string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["outputs:mtlx:surface", "outputs:mtlx:surface"]
+                int ui:nodegraph:realitykit:subgraphOutputs:stackingOrder = 39
+
+                def Shader "mat1PreviewSurface" (
+                    active = false
+                )
+                {
+                    uniform token info:id = "UsdPreviewSurface"
+                    color3f inputs:diffuseColor = (0.8, 0.8, 0.8)
+                    color3f inputs:emissiveColor = (0, 0, 0)
+                    normal3f inputs:normal = (0, 0, 0)
+                    float inputs:occlusion = 0.6
+                    float inputs:opacity = 1
+                    token outputs:displacement
+                    token outputs:surface
+                }
+
+                over "PreviewSurface" (
+                    active = true
+                )
+                {
+                    float inputs:clearcoatRoughness = 0
+                    color3f inputs:diffuseColor = (1, 1, 1) (
+                        colorSpace = "lin_srgb"
+                    )
+                    color3f inputs:emissiveColor = (1, 1, 1) (
+                        colorSpace = "lin_srgb"
+                    )
+                    float inputs:ior = 0
+                    float3 inputs:normal = (0, 0, 0)
+                    float inputs:occlusion = 0
+                    float inputs:opacity = 0
+                    float inputs:opacityThreshold = 1
+                    float inputs:roughness = 0
+                    float2 ui:nodegraph:node:pos = (-258.5586, 162.78516)
+                    int ui:nodegraph:node:stackingOrder = 47
+                    string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["inputs:normal", "inputs:opacity", "Advanced", "inputs:diffuseColor", "inputs:emissiveColor", "inputs:normal", "inputs:diffuseColor", "inputs:metallic", "inputs:clearcoatRoughness"]
                 }
             }
         }
@@ -689,6 +797,33 @@ def Xform "Root"
 
                 def RealityKitStruct "pose"
                 {
+                }
+            }
+        }
+
+        over "collider" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            rel material:binding = </Root/collider/Materials/mat1_1> (
+                bindMaterialAs = "weakerThanDescendants"
+            )
+
+            over "collider_geometry" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                rel material:binding = </Root/collider/Materials/mat1_1> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+
+                over "mat1_subset" (
+                    prepend apiSchemas = ["MaterialBindingAPI"]
+                )
+                {
+                    rel material:binding = </Root/collider/Materials/mat1_1> (
+                        bindMaterialAs = "weakerThanDescendants"
+                    )
                 }
             }
         }

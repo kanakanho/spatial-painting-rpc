@@ -198,6 +198,33 @@ func matmul4x4_4x1(_ A: [[Double]], _ B: [Double]) -> [Double] {
     return result
 }
 
+func matmul4x4_4x1(_ A: [[Float]], _ B: [Float]) -> [Float] {
+    var result = [Float](repeating: 0, count: 4)
+    for i in 0..<4 {
+        for j in 0..<3 {
+            result[i] += A[i][j] * B[j]
+        }
+        result[i] += A[i][3]
+    }
+    return result
+}
+
+func matmul4x4_4x1(_ A: simd_float4x4, _ B: SIMD4<Float>) -> SIMD3<Float> {
+    let Am: [[Float]] = A.floatList
+    let Bm: [Float] = [B.x, B.y, B.z, 1.0]
+    let result = matmul4x4_4x1(Am, Bm)
+    return .init(result)
+}
+
+func matmul4x4_3x1(_ A: simd_float4x4, _ B: SIMD3<Float>) -> SIMD3<Float> {
+    let Am: [[Float]] = A.floatList
+    let Bm: [Float] = [B.x, B.y, B.z, 1.0]
+    let result = matmul4x4_4x1(Am, Bm)
+    return .init(result)
+//    let v: SIMD4<Float> = simd_mul(A, SIMD4<Float>(B, 1.0))
+//    return v.xyz
+}
+
 func affineMatrixToAngle(_ matrix: [[Double]]) -> (Double, Double, Double) {
     let x = atan2(matrix[2][1], matrix[2][2])
     let y = atan2(-matrix[2][0], sqrt(pow(matrix[2][1], 2) + pow(matrix[2][2], 2)))

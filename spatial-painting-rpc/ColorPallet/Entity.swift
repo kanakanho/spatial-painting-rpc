@@ -33,3 +33,11 @@ extension ModelEntity {
         return entity
     }
 }
+
+// MARK: — Entity 拡張
+extension Entity {
+    /// StrokeComponent を持っているかどうか
+    var hasStrokeComponent: Bool {
+        components.contains { $0 is StrokeComponent }
+    }
+}

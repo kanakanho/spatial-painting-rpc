@@ -180,6 +180,9 @@ class RPCModel: ObservableObject {
     
     var mcPeerIDUUIDWrapper = MCPeerIDUUIDWrapper()
     
+    private let jsonDecoder = JSONDecoder()
+    private let jsonEncoder = JSONEncoder()
+    
     init(sendExchangeDataWrapper: ExchangeDataWrapper, receiveExchangeDataWrapper: ExchangeDataWrapper, mcPeerIDUUIDWrapper: MCPeerIDUUIDWrapper) {
         self.sendExchangeDataWrapper = sendExchangeDataWrapper
         self.receiveExchangeDataWrapper = receiveExchangeDataWrapper
@@ -190,7 +193,7 @@ class RPCModel: ObservableObject {
     }
     
     func receiveExchangeDataDidChange(_ exchangeData: ExchangeData) {
-        guard let request = try? JSONDecoder().decode(RequestSchema.self, from: exchangeData.data) else {
+        guard let request = try? jsonDecoder.decode(RequestSchema.self, from: exchangeData.data) else {
             print("Failed to decode request")
             return
         }
@@ -236,7 +239,7 @@ class RPCModel: ObservableObject {
             return RPCResult("Invalid request")
         }
         // リクエストを送信
-        guard let requestData = try? JSONEncoder().encode(request) else {
+        guard let requestData = try? jsonEncoder.encode(request) else {
             return RPCResult("Failed to encode request")
         }
         sendExchangeDataWrapper.setData(requestData)
@@ -282,7 +285,7 @@ class RPCModel: ObservableObject {
             return RPCResult("Invalid request")
         }
         // リクエストを送信
-        guard let requestData = try? JSONEncoder().encode(request) else {
+        guard let requestData = try? jsonEncoder.encode(request) else {
             return RPCResult("Failed to encode request")
         }
         sendExchangeDataWrapper.setData(requestData, to: mcPeerId)

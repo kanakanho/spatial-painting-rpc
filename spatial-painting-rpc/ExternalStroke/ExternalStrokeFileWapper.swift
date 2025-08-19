@@ -16,6 +16,9 @@ class ExternalStrokeFileWapper {
     
     private let systemSoundPlayer = SystemSoundPlayer()
     
+    var planeNormalVector: SIMD3<Float> = SIMD3<Float>(0,0,0)
+    var planePoint: SIMD3<Float> = SIMD3<Float>(0,0,0)
+    
     init() {
         self.documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         fileDir = documentDirectory.appendingPathComponent("StrokeCanvas/")
@@ -31,7 +34,7 @@ class ExternalStrokeFileWapper {
     }
     
     /// 外部に保存する
-    func writeStroke(externalStrokes : [ExternalStroke], displayScale: CGFloat, planeNormalVector: SIMD3<Float>, planePoint: SIMD3<Float>) {
+    func writeStroke(strokes : [Stroke], displayScale: CGFloat, planeNormalVector: SIMD3<Float>, planePoint: SIMD3<Float>) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let nowDate = Date()
@@ -42,11 +45,11 @@ class ExternalStrokeFileWapper {
             let directoryURL = jsonFileURL.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true, attributes: nil)
             
-            let data = try encoder.encode(externalStrokes)
+            let data = try encoder.encode(strokes)
             try data.write(to: jsonFileURL)
             print("File written to: \(jsonFileURL.path)")
             
-            guard let imageData = makePNGData(strokes: externalStrokes, planeNormal: planeNormalVector, planePoint: planePoint, displayScale: displayScale) else {
+            guard let imageData = makePNGData(strokes: strokes, planeNormal: planeNormalVector, planePoint: planePoint, displayScale: displayScale) else {
                 print("Error converting image to PNG data")
                 return
             }
@@ -72,16 +75,21 @@ class ExternalStrokeFileWapper {
     }
     
     /// ストロークから画像を作る
-    private func makePNGData(strokes: [ExternalStroke], planeNormal: SIMD3<Float>, planePoint: SIMD3<Float>, displayScale: CGFloat) -> Data? {
+    private func makePNGData(strokes: [Stroke], planeNormal: SIMD3<Float>, planePoint: SIMD3<Float>, displayScale: CGFloat) -> Data? {
         let canvasSize = CGSize(width: 1024, height: 1024)
+        /*
+         let n = normalize(planeNormal)
+         let arbitrary: SIMD3<Float> = abs(n.x) < 0.9 ? [1,0,0] : [0,1,0]
+         let u = normalize(cross(n, arbitrary)), v = cross(n, u)
+         */
         // planeNormal を正規化
         let n = normalize(planeNormal)
         // ワールドの下向きベクトル
-        let worldDown = SIMD3<Float>(0, -1, 0)
+        let worldUp = SIMD3<Float>(0, -1, 0)
         
-        // 1) worldDownを平面に落とした「平面内の下向きv」を計算
-        var v = worldDown - n * dot(worldDown, n)
-        // もしほとんどゼロベクトル（planeNormalがworldDownと平行）なら
+        // 1) worldUpを平面に落とした「平面内の上向きvを計算
+        var v = worldUp - n * dot(worldUp, n)
+        // もしほとんどゼロベクトル（planeNormalがworldUpと平行）なら
         if length(v) < 1e-6 {
             // 任意の横方向を使う（平面が水平 or ほぼ水平のときのフォールバック）
             v = normalize(cross(n, SIMD3<Float>(1, 0, 0)))
@@ -132,7 +140,7 @@ class ExternalStrokeFileWapper {
         
         // 描画
         for (idx, stroke) in strokes.enumerated() {
-            ctx.setStrokeColor(stroke.color.cgColor)
+            ctx.setStrokeColor(stroke.activeColor.cgColor)
             let proj = all2D[idx]
             guard proj.count > 1 else { continue }
             ctx.beginPath()
@@ -152,6 +160,9 @@ class ExternalStrokeFileWapper {
         
         guard let cgImg = ctx.makeImage() else { return nil }
         
+        // 90°回転
+        //let finalImage = rotateCGImage90Clockwise(cgImg) ?? cgImg
+        
         // CGImageDestination で PNG データ化
         let mutableData = CFDataCreateMutable(nil, 0)!
         guard let dest = CGImageDestinationCreateWithData(
@@ -162,11 +173,54 @@ class ExternalStrokeFileWapper {
         ) else {
             return nil
         }
-        CGImageDestinationAddImage(dest, cgImg, nil)
+        CGImageDestinationAddImage(dest, cgImg /*finalImage*/, nil)
         guard CGImageDestinationFinalize(dest) else {
             return nil
         }
         return mutableData as Data
+    }
+    
+    /// CGImageを90°時計回りに回転した新しいCGImageを返す
+    func rotateCGImage90Clockwise(_ image: CGImage) -> CGImage? {
+        let w = image.width
+        let h = image.height
+        
+        guard
+            let colorSpace = image.colorSpace,
+            let ctx = CGContext(
+                data: nil,
+                width: h,               // 幅と高さを反転
+                height: w,
+                bitsPerComponent: image.bitsPerComponent,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: image.bitmapInfo.rawValue
+            )
+        else {
+            return nil
+        }
+        
+        // 原点を左下（新コンテキストの (0,w)）に移動
+        ctx.translateBy(x: 0, y: CGFloat(w))
+        // -90° 回転 (radians)
+        ctx.rotate(by: -CGFloat.pi/2)
+        // 元画像を描画
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: CGFloat(w), height: CGFloat(h)))
+        return ctx.makeImage()
+    }
+    
+    // entity の「前方向（−Z 軸）」をベクトルで得る
+    func forwardVector(of entity: Entity) -> SIMD3<Float> {
+        // RealityKit では回転が transform.rotation（simd_quatf）に入っている
+        let q: simd_quatf = entity.transform.rotation
+        
+        // ローカル空間の「前方向」ベクトル (0,0,-1) をクォータニオンで回転
+        let localForward = SIMD3<Float>(0, 0, -1)
+        let worldForward = q.act(localForward)
+        
+        print("Forward vector: \(worldForward)")
+        
+        return normalize(worldForward)
     }
     
     /// ディレクトリの一覧を取得する
@@ -185,12 +239,12 @@ class ExternalStrokeFileWapper {
     }
     
     /// jsonを取得する
-    func readStrokes(in dateStr: String) -> [ExternalStroke] {
+    func readStrokes(in dateStr: String) -> [Stroke] {
         do {
             let jsonFileURL = fileDir.appendingPathComponent("\(dateStr)/strokes.json")
             let data = try Data(contentsOf: jsonFileURL)
             let decoder = JSONDecoder()
-            let strokes = try decoder.decode([ExternalStroke].self, from: data)
+            let strokes = try decoder.decode([Stroke].self, from: data)
             return strokes
         }
         catch {

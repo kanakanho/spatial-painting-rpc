@@ -12,12 +12,15 @@ struct ExternalStrokeView: View {
     
     @Environment(\.displayScale) private var displayScale: CGFloat
     
+    var externalStrokeFileWapper: ExternalStrokeFileWapper = ExternalStrokeFileWapper()
+    
     @State private var imageURLs: [URL] = []
     @State private var selectedURL: URL?
     
     @State var fileList: [String] = []
     @State var selectedFile: String = ""
     
+    @State private var isLoading: Bool = false
     @State private var isDeleteMode: Bool = false
     
     var body: some View {
@@ -55,8 +58,7 @@ struct ExternalStrokeView: View {
             } else {
                 // 保存
                 Button("Save Stroke") {
-                    let externalStrokes: [ExternalStroke] = .init(strokes: appModel.rpcModel.painting.paintingCanvas.strokes , initPoint: .one)
-                    appModel.externalStrokeFileWapper.writeStroke(externalStrokes: externalStrokes, displayScale: displayScale, planeNormalVector: .one, planePoint: .one)
+                    appModel.externalStrokeFileWapper.writeStroke(strokes: appModel.rpcModel.painting.paintingCanvas.strokes, displayScale: displayScale, planeNormalVector: .one, planePoint: .one)
                     fileList = appModel.externalStrokeFileWapper.listDirs().map { $0.lastPathComponent }.sorted(by: >)
                     imageURLs = loadThumbnails()
                     if fileList.count == 1 {
@@ -83,33 +85,51 @@ struct ExternalStrokeView: View {
                 .ignoresSafeArea(edges: .bottom)
                 
                 // ファイル読み込み
-                Button("Load Stroke") {
-                    if let comps = selectedURL?.pathComponents {
-                        selectedFile = comps[comps.count - 2]
-                    }
-                    if !selectedFile.isEmpty {
-                        let externalStrokes = appModel.externalStrokeFileWapper.readStrokes(in: selectedFile)
-                        appModel.rpcModel.painting.paintingCanvas.addStrokes(externalStrokes.strokes())
-                        for (id,affineMatrix) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                            let transformedExternalStrokes = externalStrokes.map({ externalStroke in
-                                // points 全てにアフィン変換を適用
-                                let transformedPoints = externalStroke.points.map { point in
-                                    return SIMD3<Float>(affineMatrix * SIMD4<Float>(point.x, point.y, point.z, 1.0))
-                                }
-                                return ExternalStroke(points: transformedPoints, color: externalStroke.color, maxRadius: externalStroke.maxRadius)
-                            })
-                            _ = appModel.rpcModel.sendRequest(
-                                .init(
-                                    peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                                    method: .addStrokes,
-                                    param: .addStrokes(.init(externalStrokes: transformedExternalStrokes))
-                                ),
-                                mcPeerId: id
-                            )
+                Toggle("Load Stroke Mode", isOn: $isLoading)
+                    .toggleStyle(.button)
+                    .padding(.bottom, 20)
+                    .onChange(of: isLoading) {
+                        if isLoading {
+                            if let comps = selectedURL?.pathComponents {
+                                selectedFile = comps[comps.count - 2]
+                            }
+                            if !selectedFile.isEmpty {
+                                appModel.rpcModel.painting.paintingCanvas.addTmpStrokes(appModel.externalStrokeFileWapper.readStrokes(in: selectedFile))
+                            }
+                        } else {
+                            appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
                         }
                     }
+                
+                // ロードしたデータの確定
+                Button("Confirm Loaded Stroke") {
+                    for (id,affineMatrix) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                        let transformedStrokes = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: Stroke) in
+                            // points 全てにアフィン変換を適用
+                            let tmpRootTransfromPoints: [SIMD4<Float>] = stroke.points.map { (point: SIMD3<Float>) in
+                                return stroke.entity.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
+                            }
+                            let transformedPoints = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
+                                matmul4x4_4x1(affineMatrix, point)
+                            }
+                            return Stroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
+                        })
+                        _ = appModel.rpcModel.sendRequest(
+                            .init(
+                                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                                method: .addStrokes,
+                                param: .addStrokes(.init(strokes: transformedStrokes))
+                            ),
+                            mcPeerId: id
+                        )
+                    }
+                    appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
+                    // isLoading を false にしてロードモードを終了
+                    isLoading = false
                 }
                 .padding(.bottom, 20)
+                .disabled(!appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty)
+                
             }
             Toggle("Delete Mode", isOn: $isDeleteMode)
                 .toggleStyle(.button)
@@ -120,6 +140,12 @@ struct ExternalStrokeView: View {
         .onAppear() {
             fileList = appModel.externalStrokeFileWapper.listDirs().map { $0.lastPathComponent }.sorted(by: >)
             imageURLs = loadThumbnails()
+            externalStrokeFileWapper.planeNormalVector = appModel.model.planeNormalVector
+            externalStrokeFileWapper.planePoint = appModel.model.planePoint
+        }
+        .onDisappear {
+            isLoading = false
+            appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
         }
     }
     
