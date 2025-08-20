@@ -213,16 +213,14 @@ func matmul4x4_4x1(_ A: simd_float4x4, _ B: SIMD4<Float>) -> SIMD3<Float> {
     let Am: [[Float]] = A.floatList
     let Bm: [Float] = [B.x, B.y, B.z, 1.0]
     let result = matmul4x4_4x1(Am, Bm)
-    return .init(result)
+    return SIMD3<Float>(result[0], result[1], result[2])
 }
 
 func matmul4x4_3x1(_ A: simd_float4x4, _ B: SIMD3<Float>) -> SIMD3<Float> {
     let Am: [[Float]] = A.floatList
     let Bm: [Float] = [B.x, B.y, B.z, 1.0]
     let result = matmul4x4_4x1(Am, Bm)
-    return .init(result)
-//    let v: SIMD4<Float> = simd_mul(A, SIMD4<Float>(B, 1.0))
-//    return v.xyz
+    return SIMD3<Float>(result[0], result[1], result[2])
 }
 
 func affineMatrixToAngle(_ matrix: [[Double]]) -> (Double, Double, Double) {

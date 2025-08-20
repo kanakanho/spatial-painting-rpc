@@ -82,7 +82,7 @@ struct ContentView: View {
             // 5秒後にImmersive Spaceを開く
             if  !isStartImmersiveSpace {
                 let elapsedTime = Date().timeIntervalSince(startTime)
-                if elapsedTime >= 6 {
+                if elapsedTime >= 3 {
                     isStartImmersiveSpace = true
                 }
             } else {

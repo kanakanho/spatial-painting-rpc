@@ -229,8 +229,7 @@ extension PaintingCanvas {
         generateInputTargetEntity()
         
         for stroke in tmpStrokes {
-            stroke.points = stroke.points.map {
-                let position = $0
+            stroke.points = stroke.points.map { (position:  SIMD3<Float>) in
                 // entityのローカル座標に変換する
                 return stroke.entity.convert(position: position, from: nil)
             }

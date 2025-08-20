@@ -10,10 +10,12 @@ import RealityKit
 import UIKit
 import ImageIO
 
+@Observable
 class ExternalStrokeFileWapper {
     private let documentDirectory: URL
     private var fileDir: URL
     
+    var isFileManagerActive: Bool = false
     private let systemSoundPlayer = SystemSoundPlayer()
     
     var planeNormalVector: SIMD3<Float> = SIMD3<Float>(0,0,0)

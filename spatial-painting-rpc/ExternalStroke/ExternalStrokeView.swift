@@ -12,8 +12,6 @@ struct ExternalStrokeView: View {
     
     @Environment(\.displayScale) private var displayScale: CGFloat
     
-    var externalStrokeFileWapper: ExternalStrokeFileWapper = ExternalStrokeFileWapper()
-    
     @State private var imageURLs: [URL] = []
     @State private var selectedURL: URL?
     
@@ -94,7 +92,8 @@ struct ExternalStrokeView: View {
                                 selectedFile = comps[comps.count - 2]
                             }
                             if !selectedFile.isEmpty {
-                                appModel.rpcModel.painting.paintingCanvas.addTmpStrokes(appModel.externalStrokeFileWapper.readStrokes(in: selectedFile))
+                                let strokes: [Stroke] = appModel.externalStrokeFileWapper.readStrokes(in: selectedFile)
+                                appModel.rpcModel.painting.paintingCanvas.addTmpStrokes(strokes)
                             }
                         } else {
                             appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
@@ -140,12 +139,14 @@ struct ExternalStrokeView: View {
         .onAppear() {
             fileList = appModel.externalStrokeFileWapper.listDirs().map { $0.lastPathComponent }.sorted(by: >)
             imageURLs = loadThumbnails()
-            externalStrokeFileWapper.planeNormalVector = appModel.model.planeNormalVector
-            externalStrokeFileWapper.planePoint = appModel.model.planePoint
+            appModel.externalStrokeFileWapper.planeNormalVector = appModel.model.planeNormalVector
+            appModel.externalStrokeFileWapper.planePoint = appModel.model.planePoint
+            appModel.externalStrokeFileWapper.isFileManagerActive = true
         }
         .onDisappear {
             isLoading = false
             appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
+            appModel.externalStrokeFileWapper.isFileManagerActive = false
         }
     }
     

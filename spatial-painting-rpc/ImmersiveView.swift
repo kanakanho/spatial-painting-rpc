@@ -20,7 +20,6 @@ struct ImmersiveView: View {
     @State private var latestRightIndexFingerCoordinates: simd_float4x4 = .init()
     @State private var lastIndexPose: SIMD3<Float>? = nil
     @State private var sourceTransform: Transform? = nil
-    @State private var isFileManagerActive: Bool = false
     
     private let keyDownHeight: Float = 0.005
     
@@ -141,11 +140,28 @@ struct ImmersiveView: View {
                             let isHandGripped = appModel.model.isHandGripped
                             
                             if isHandGripped {
-                                if let translation = value.first?.translation3D {
-                                    let rotationX = Float(translation.x / 1000.0) * .pi
-                                    let rotationY = Float(translation.y / 1000.0) * .pi
-                                    
-                                    value.entity.transform.rotation = sourceTransform!.rotation * simd_quatf(angle: rotationX, axis: [0, 1, 0]) * simd_quatf(angle: rotationY, axis: [1, 0, 0])
+                                // 例: ジェスチャ中の更新ハンドラ内
+                                if let t = value.first?.translation3D,
+                                   let src = sourceTransform {
+                                    // ← ジェスチャ開始時に保存した Transform
+
+                                    // 1) ドラッグ量 → 角度（ラジアン）に変換（係数は好みで調整）
+                                    let radiansPerMeter: Float = 0.01
+                                    let yaw   = Float(t.x) * radiansPerMeter // 水平ドラッグ → Yaw
+                                    let pitch = Float(t.y) * radiansPerMeter // 垂直ドラッグ → Pitch
+
+                                    // 2) まずワールド Y 軸で Yaw を適用（turntable 風）
+                                    let qYaw = simd_quatf(angle: yaw, axis: [0, 1, 0])
+                                    var q = qYaw * src.rotation
+                                    // ← 右側（src）→ 左側（qYaw）の順で適用
+
+                                    // 3) つづいて「Yaw 後のローカル X 軸」を求めて Pitch を適用
+                                    let localXAfterYaw = normalize(q.act([1, 0, 0]))
+                                    let qPitch = simd_quatf(angle: pitch, axis: localXAfterYaw)
+                                    q = qPitch * q
+
+                                    // 4) 正規化して反映
+                                    value.entity.transform.rotation = simd_normalize(q)
                                 }
                             } else if let magnification = value.second?.magnification {
                                 //print("magnification: \(magnification)")
@@ -421,40 +437,36 @@ extension ImmersiveView {
     
     // MARK: — Ended-handlers
     private func toggleStrokeWindow() {
-        if !isFileManagerActive {
+        if !appModel.externalStrokeFileWapper.isFileManagerActive {
             openWindow(id: "ExternalStroke")
         } else {
-            for element in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                let id: Int = element.key
-                let affineMatrix: simd_float4x4 = element.value
-                
-                let transformedStrokes: [Stroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map { (stroke:Stroke) in
-                    let transformedPoints: [SIMD3<Float>] = stroke.points.map { (point: SIMD3<Float>) in
-                        let position = SIMD4<Float>(point, 1.0)
-                        let transformed = affineMatrix * (stroke.entity.transformMatrix(relativeTo: nil) * position)
-                        return transformed.xyz
+            print("FileManager is already active.")
+            for (id,affineMatrix) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                let transformedStrokes = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: Stroke) in
+                    // points 全てにアフィン変換を適用
+                    let tmpRootTransfromPoints: [SIMD4<Float>] = stroke.points.map { (point: SIMD3<Float>) in
+                        return stroke.entity.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
                     }
-                    return Stroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor)
-                }
-                
+                    let transformedPoints = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
+                        matmul4x4_4x1(affineMatrix, point)
+                    }
+                    return Stroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
+                })
                 _ = appModel.rpcModel.sendRequest(
-                    RequestSchema(
+                    .init(
                         peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                        method: .confirmTmpStrokes,
-                        param: .confirmTmpStrokes(
-                            .init(strokes: transformedStrokes)
-                        )
+                        method: .addStrokes,
+                        param: .addStrokes(.init(strokes: transformedStrokes))
                     ),
                     mcPeerId: id
                 )
-                DispatchQueue.main.async {
-                    dismissWindow(id: "ExternalStroke")
-                }
             }
-            isFileManagerActive.toggle()
-            dismissWindow(id: "ExternalStroke")
+            appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
+            DispatchQueue.main.async {
+                dismissWindow(id: "ExternalStroke")
+            }
         }
-        isFileManagerActive.toggle()
+        appModel.externalStrokeFileWapper.isFileManagerActive.toggle()
     }
 }
 

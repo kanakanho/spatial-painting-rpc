@@ -68,10 +68,7 @@ class Painting:ObservableObject {
     
     /// これまでに書いた全てのストロークを削除する
     func removeAllStroke() {
-        // これまでに書いたストロークを表示から削除
-        paintingCanvas.root.children.removeAll()
-        // これまでに書いたストロークをデータから削除
-        paintingCanvas.strokes.removeAll()
+        paintingCanvas.reset()
     }
     
     /// 指定したUUIDを `StrokeComponent` に持つストロークを削除する
@@ -105,11 +102,6 @@ class Painting:ObservableObject {
         paintingCanvas.addStrokes(param.strokes)
     }
     
-    /// 追加したストロークを確定する
-    func confirmTmpStrokes(param: ConfirmTmpStrokesParam) {
-        paintingCanvas.confirmTmpStrokes()
-    }
-    
     /// 線の太さを変更する
     func changeFingerLineWidth(param: ChangeFingerLineWidthParam) {
         //print("Finger line width changed to: \(toolName)")
@@ -133,7 +125,6 @@ struct PaintingEntity: RPCEntity {
         case addStrokes
         case finishStroke
         case changeFingerLineWidth
-        case confirmTmpStrokes
     }
     
     enum Param: RPCEntityParam {
@@ -144,7 +135,6 @@ struct PaintingEntity: RPCEntity {
         case addStrokes(AddStrokesParam)
         case finishStroke(FinishStrokeParam)
         case changeFingerLineWidth(ChangeFingerLineWidthParam)
-        case confirmTmpStrokes(ConfirmTmpStrokesParam)
         
         struct SetStrokeColorParam: Codable {
             let strokeColorName: String
@@ -173,10 +163,6 @@ struct PaintingEntity: RPCEntity {
             let toolName: String
         }
         
-        struct ConfirmTmpStrokesParam: Codable {
-            let strokes: [Stroke]
-        }
-        
         func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             switch self {
@@ -194,8 +180,6 @@ struct PaintingEntity: RPCEntity {
                 try container.encode(param, forKey: .finishStroke)
             case .changeFingerLineWidth(let param):
                 try container.encode(param, forKey: .changeFingerLineWidth)
-            case .confirmTmpStrokes(let param):
-                try container.encode(param, forKey: .confirmTmpStrokes)
             }
         }
         
@@ -215,8 +199,6 @@ struct PaintingEntity: RPCEntity {
                 self = .finishStroke(param)
             } else if let param = try? container.decode(ChangeFingerLineWidthParam.self, forKey: .changeFingerLineWidth) {
                 self = .changeFingerLineWidth(param)
-            } else if let param = try? container.decode(ConfirmTmpStrokesParam.self, forKey: .confirmTmpStrokes) {
-                self = .confirmTmpStrokes(param)
             } else {
                 throw DecodingError.dataCorruptedError(forKey: CodingKeys.setStrokeColor, in: container, debugDescription: "Invalid parameter type")
             }
@@ -230,7 +212,6 @@ struct PaintingEntity: RPCEntity {
             case addStrokes
             case finishStroke
             case changeFingerLineWidth
-            case confirmTmpStrokes
         }
     }
 }
@@ -242,4 +223,3 @@ typealias AddStrokePointParam = PaintingEntity.Param.AddStrokePointParam
 typealias AddStrokesParam = PaintingEntity.Param.AddStrokesParam
 typealias FinishStrokeParam = PaintingEntity.Param.FinishStrokeParam
 typealias ChangeFingerLineWidthParam = PaintingEntity.Param.ChangeFingerLineWidthParam
-typealias ConfirmTmpStrokesParam = PaintingEntity.Param.ConfirmTmpStrokesParam

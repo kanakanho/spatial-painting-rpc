@@ -276,8 +276,6 @@ class RPCModel: ObservableObject {
         case let
             (.paintingEntity(.setStrokeColor),.paintingEntity(.setStrokeColor(p))):
             painting.setStrokeColor(param: p)
-        case let (.paintingEntity(.confirmTmpStrokes),.paintingEntity(.confirmTmpStrokes(p))):
-            painting.confirmTmpStrokes(param: p)
         default:
             return RPCResult("Invalid request")
         }
