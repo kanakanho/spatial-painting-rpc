@@ -23,6 +23,8 @@ struct ImmersiveView: View {
     
     private let keyDownHeight: Float = 0.005
     
+    @State private var isCurrentSendPoint: Bool = false
+    
     var body: some View {
         RealityView { content in
             do {
@@ -185,6 +187,10 @@ struct ImmersiveView: View {
                     else if !appModel.model.isEraserMode,
                               appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
                               let pos = lastIndexPose {
+                        isCurrentSendPoint.toggle()
+                        if isCurrentSendPoint {
+                            return
+                        }
                         let uuid: UUID = UUID()
                         appModel.rpcModel.painting.paintingCanvas.addPoint(uuid, pos)
                         for (id,affineMatrix) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
