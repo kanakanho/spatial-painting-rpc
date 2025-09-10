@@ -78,19 +78,19 @@ class ExternalStrokeFileWapper {
     
     /// ストロークから画像を作る
     private func makePNGData(strokes: [Stroke], planeNormal: SIMD3<Float>, planePoint: SIMD3<Float>, displayScale: CGFloat) -> Data? {
-        let canvasSize = CGSize(width: 1024, height: 1024)
+        let canvasSize: CGSize = CGSize(width: 1024, height: 1024)
         /*
          let n = normalize(planeNormal)
          let arbitrary: SIMD3<Float> = abs(n.x) < 0.9 ? [1,0,0] : [0,1,0]
          let u = normalize(cross(n, arbitrary)), v = cross(n, u)
          */
         // planeNormal を正規化
-        let n = normalize(planeNormal)
+        let n: SIMD3<Float> = normalize(planeNormal)
         // ワールドの下向きベクトル
-        let worldUp = SIMD3<Float>(0, -1, 0)
+        let worldUp: SIMD3<Float> = SIMD3<Float>(0, -1, 0)
         
         // 1) worldUpを平面に落とした「平面内の上向きvを計算
-        var v = worldUp - n * dot(worldUp, n)
+        var v: SIMD3<Float> = worldUp - n * dot(worldUp, n)
         // もしほとんどゼロベクトル（planeNormalがworldUpと平行）なら
         if length(v) < 1e-6 {
             // 任意の横方向を使う（平面が水平 or ほぼ水平のときのフォールバック）
@@ -100,18 +100,21 @@ class ExternalStrokeFileWapper {
         }
         
         // 2) X軸方向uは外積で
-        let u = normalize(cross(v, n))
+        let u: SIMD3<Float> = normalize(cross(v, n))
         
         // 以降はu,vを使って3D→2D射影
         // 2D射影＋バウンディング計算
         var all2D: [[SIMD2<Float>]] = []
-        var minX = Float.greatestFiniteMagnitude, maxX = -Float.greatestFiniteMagnitude
-        var minY = Float.greatestFiniteMagnitude, maxY = -Float.greatestFiniteMagnitude
-        for stroke in strokes {
+        var minX: Float = Float.greatestFiniteMagnitude
+        var maxX: Float = -Float.greatestFiniteMagnitude
+        var minY: Float = Float.greatestFiniteMagnitude
+        var maxY: Float = -Float.greatestFiniteMagnitude
+        for stroke: Stroke in strokes {
             var proj: [SIMD2<Float>] = []
-            for p in stroke.points {
-                let pProj = p - dot(p - planePoint, n) * n
-                let x = dot(pProj - planePoint, u), y = dot(pProj - planePoint, v)
+            for p: SIMD3<Float> in stroke.points {
+                let pProj: SIMD3<Float> = p - dot(p - planePoint, n) * n
+                let x: Float = dot(pProj - planePoint, u)
+                let y: Float = dot(pProj - planePoint, v)
                 proj.append([x,y])
                 minX = min(minX, x); maxX = max(maxX, x)
                 minY = min(minY, y); maxY = max(maxY, y)
@@ -121,13 +124,14 @@ class ExternalStrokeFileWapper {
         
         // スケーリング
         let inset: CGFloat = 50
-        let wF = maxX - minX, hF = maxY - minY
-        let scale = min((canvasSize.width - inset*2)/CGFloat(wF),
+        let wF: Float = maxX - minX
+        let hF: Float = maxY - minY
+        let scale: CGFloat = min((canvasSize.width - inset*2)/CGFloat(wF),
                         (canvasSize.height - inset*2)/CGFloat(hF))
         
         // CGContext作成
-        guard let cs = CGColorSpace(name: CGColorSpace.sRGB),
-              let ctx = CGContext(
+        guard let cs: CGColorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx: CGContext = CGContext(
                 data: nil,
                 width: Int(canvasSize.width * displayScale),
                 height: Int(canvasSize.height * displayScale),
@@ -141,17 +145,17 @@ class ExternalStrokeFileWapper {
         ctx.setLineWidth(4)
         
         // 描画
-        for (idx, stroke) in strokes.enumerated() {
+        for (idx, stroke): (Int, Stroke) in strokes.enumerated() {
             ctx.setStrokeColor(stroke.activeColor.cgColor)
-            let proj = all2D[idx]
+            let proj: [SIMD2<Float>] = all2D[idx]
             guard proj.count > 1 else { continue }
             ctx.beginPath()
-            let first = proj[0]
+            let first: SIMD2<Float> = proj[0]
             ctx.move(to: CGPoint(
                 x: CGFloat(first.x - minX)*scale + inset,
                 y: CGFloat(maxY - first.y)*scale + inset
             ))
-            for pt in proj.dropFirst() {
+            for pt: SIMD2<Float> in proj.dropFirst() {
                 ctx.addLine(to: CGPoint(
                     x: CGFloat(pt.x - minX)*scale + inset,
                     y: CGFloat(maxY - pt.y)*scale + inset
@@ -160,14 +164,14 @@ class ExternalStrokeFileWapper {
             ctx.strokePath()
         }
         
-        guard let cgImg = ctx.makeImage() else { return nil }
+        guard let cgImg: CGImage = ctx.makeImage() else { return nil }
         
         // 90°回転
         //let finalImage = rotateCGImage90Clockwise(cgImg) ?? cgImg
         
         // CGImageDestination で PNG データ化
-        let mutableData = CFDataCreateMutable(nil, 0)!
-        guard let dest = CGImageDestinationCreateWithData(
+        let mutableData: CFMutableData = CFDataCreateMutable(nil, 0)!
+        guard let dest: CGImageDestination = CGImageDestinationCreateWithData(
             mutableData,
             "public.png" as CFString,
             1,

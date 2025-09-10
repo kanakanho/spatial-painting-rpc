@@ -113,10 +113,9 @@ struct ImmersiveView: View {
         .task {
             appModel.model.showFingerTipSpheres()
         }
-        .onChange(of: appModel.model.isArrowShown) { _, newValue in
-            let newValue: Bool = newValue
+        .onChange(of: appModel.model.isArrowShown) {
             Task {
-                if newValue {
+                if appModel.model.isArrowShown {
                     appModel.model.showHandArrowEntities()
                 } else {
                     appModel.model.hideHandArrowEntities()
@@ -131,43 +130,42 @@ struct ImmersiveView: View {
             DragGesture(minimumDistance: 0)
                 .simultaneously(with: MagnifyGesture())
                 .targetedToAnyEntity()
-                .onChanged({ value in
-                    let value: EntityTargetValue<SimultaneousGesture<DragGesture, MagnifyGesture>.Value> = value
+                .onChanged({ (value: EntityTargetValue<SimultaneousGesture<DragGesture, MagnifyGesture>.Value>) in
                     if sourceTransform == nil {
                         sourceTransform = value.entity.transform
                     }
                     /// 保存したストロークを再度表示させるための処理
                     if !appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty {
                         if value.entity.name == "boundingBox" {
-                            let isHandGripped = appModel.model.isHandGripped
+                            let isHandGripped: Bool = appModel.model.isHandGripped
                             
                             if isHandGripped {
                                 // 例: ジェスチャ中の更新ハンドラ内
-                                if let t = value.first?.translation3D,
-                                   let src = sourceTransform {
+                                if let t: Vector3D  = value.first?.translation3D,
+                                   let src: Transform = sourceTransform {
                                     // ← ジェスチャ開始時に保存した Transform
 
                                     // 1) ドラッグ量 → 角度（ラジアン）に変換（係数は好みで調整）
                                     let radiansPerMeter: Float = 0.01
-                                    let yaw   = Float(t.x) * radiansPerMeter // 水平ドラッグ → Yaw
-                                    let pitch = Float(t.y) * radiansPerMeter // 垂直ドラッグ → Pitch
+                                    let yaw: Float   = Float(t.x) * radiansPerMeter // 水平ドラッグ → Yaw
+                                    let pitch: Float = Float(t.y) * radiansPerMeter // 垂直ドラッグ → Pitch
 
                                     // 2) まずワールド Y 軸で Yaw を適用（turntable 風）
-                                    let qYaw = simd_quatf(angle: yaw, axis: [0, 1, 0])
-                                    var q = qYaw * src.rotation
+                                    let qYaw: simd_quatf = simd_quatf(angle: yaw, axis: [0, 1, 0])
+                                    var q: simd_quatf = qYaw * src.rotation
                                     // ← 右側（src）→ 左側（qYaw）の順で適用
 
                                     // 3) つづいて「Yaw 後のローカル X 軸」を求めて Pitch を適用
-                                    let localXAfterYaw = normalize(q.act([1, 0, 0]))
-                                    let qPitch = simd_quatf(angle: pitch, axis: localXAfterYaw)
+                                    let localXAfterYaw: SIMD3<Float> = normalize(q.act([1, 0, 0]))
+                                    let qPitch: simd_quatf = simd_quatf(angle: pitch, axis: localXAfterYaw)
                                     q = qPitch * q
 
                                     // 4) 正規化して反映
                                     value.entity.transform.rotation = simd_normalize(q)
                                 }
-                            } else if let magnification = value.second?.magnification {
+                            } else if let magnification: CGFloat = value.second?.magnification {
                                 //print("magnification: \(magnification)")
-                                let magnification = Float(magnification)
+                                let magnification: Float = Float(magnification)
                                 
                                 value.entity.transform.scale = [sourceTransform!.scale.x * magnification, sourceTransform!.scale.y * magnification, sourceTransform!.scale.z * magnification]
                                 
@@ -176,8 +174,8 @@ struct ImmersiveView: View {
                                         stroke.updateMaxRadiusAndRemesh(scaleFactor: value.entity.transform.scale.sum() / 3)
                                     }
                                 }
-                            } else if let translation = value.first?.translation3D {
-                                let convertedTranslation = value.convert(translation, from: .local, to: value.entity.parent!)
+                            } else if let translation: Vector3D = value.first?.translation3D {
+                                let convertedTranslation: SIMD3<Float> = value.convert(translation, from: .local, to: value.entity.parent!)
                                 
                                 value.entity.transform.translation = sourceTransform!.translation + convertedTranslation
                             }
@@ -185,16 +183,16 @@ struct ImmersiveView: View {
                     }
                     /// ストロークの点の追加
                     else if !appModel.model.isEraserMode,
-                              appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
-                              let pos = lastIndexPose {
+                            appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
+                            let pos: SIMD3<Float> = lastIndexPose {
                         isCurrentSendPoint.toggle()
                         if isCurrentSendPoint {
                             return
                         }
                         let uuid: UUID = UUID()
-                        appModel.rpcModel.painting.paintingCanvas.addPoint(uuid, pos)
-                        for (id,affineMatrix) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                            let clientPos = matmul4x4_3x1(affineMatrix, pos)
+                        appModel.rpcModel.painting.paintingCanvas.addPoint(uuid, pos, userId: appModel.mcPeerIDUUIDWrapper.myId)
+                        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                            let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, pos)
                             _ = appModel.rpcModel.sendRequest(
                                 RequestSchema(
                                     peerId: appModel.rpcModel.mcPeerIDUUIDWrapper.mine.hash,
@@ -202,7 +200,8 @@ struct ImmersiveView: View {
                                     param: .addStrokePoint(
                                         .init(
                                             uuid: uuid,
-                                            point: clientPos
+                                            point: clientPos,
+                                            userId: appModel.mcPeerIDUUIDWrapper.myId
                                         )
                                     )
                                 ),
@@ -219,7 +218,11 @@ struct ImmersiveView: View {
                             RequestSchema(
                                 peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
                                 method: .finishStroke,
-                                param: .finishStroke(.init())
+                                param: .finishStroke(
+                                    .init(
+                                        userId: appModel.mcPeerIDUUIDWrapper.myId
+                                    )
+                                )
                             )
                         )
                     }
@@ -243,7 +246,7 @@ struct ImmersiveView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                     Task{
                         appModel.model.fingerSignal(hand: .right, flag: false)
-                        let rpcResult = appModel.rpcModel.sendRequest(
+                        let rpcResult: RPCResult = appModel.rpcModel.sendRequest(
                             RequestSchema(
                                 peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
                                 method: .setTransform,
@@ -270,7 +273,7 @@ struct ImmersiveView: View {
                 return
             }
             
-            guard let nextPos = appModel.rpcModel.coordinateTransforms.getNextIndexFingerTipPosition() else {
+            guard let nextPos: SIMD3<Float> = appModel.rpcModel.coordinateTransforms.getNextIndexFingerTipPosition() else {
                 print("No next index finger tip position available.")
                 return
             }
@@ -282,7 +285,7 @@ struct ImmersiveView: View {
 // added by nagao 2015/7/19
 extension ImmersiveView {
     func setupCollisionSubscriptions(on content: RealityViewContent) {
-        for finger in appModel.model.fingerEntities.values {
+        for finger: ModelEntity in appModel.model.fingerEntities.values {
             subscribeBegan(on: finger, content: content)
             subscribeEnded(on: finger, content: content)
         }
@@ -295,7 +298,7 @@ extension ImmersiveView {
     }
     
     private func handleBegan(event: CollisionEvents.Began, finger: Entity) {
-        let name = event.entityB.name
+        let name: String = event.entityB.name
         
         if appModel.model.colorPalletModel.colorNames().contains(name) {
             didTouchColor(name, finger: finger)
@@ -333,19 +336,62 @@ extension ImmersiveView {
     }
     
     private func handleEnded(event: CollisionEvents.Ended, finger: Entity) {
-        let name = event.entityB.name
+        let name: String = event.entityB.name
         
         if appModel.model.colorPalletModel.colorNames().contains(name) {
             _ = appModel.rpcModel.sendRequest(
                 RequestSchema(
                     peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
                     method: .setStrokeColor,
-                    param: .setStrokeColor(.init(strokeColorName: name))
+                    param: .setStrokeColor(
+                        .init(
+                            userId: appModel.mcPeerIDUUIDWrapper.myId,
+                            strokeColorName: name
+                        )
+                    )
                 )
             )
+            
+            if appModel.rpcModel.painting.advancedColorPalletModel.selectedBasicColorName == name {
+                return
+            }
+            guard let colorBall: ColorBall = appModel.rpcModel.painting.advancedColorPalletModel.colorBalls.get(withID: name) else { return }
+            let prev: String = appModel.rpcModel.painting.advancedColorPalletModel.selectedBasicColorName
+            if !prev.isEmpty {
+                if colorBall.isBasic || name.hasPrefix("m") {
+                    if let prevEntity = appModel.rpcModel.painting.advancedColorPalletModel.colorEntityDictionary[prev] {
+                        prevEntity.setScale(SIMD3<Float>(repeating: 0.01), relativeTo: nil)
+                        if appModel.rpcModel.painting.advancedColorPalletModel.colorBalls.get(withID: prev) != nil {
+                            let subColorBalls: [ColorBall] = appModel.rpcModel.painting.advancedColorPalletModel.colorBalls.filterByID(containing: String(prev.prefix(1)), isBasic: false)
+                            for cb: ColorBall in subColorBalls {
+                                if let entity2: Entity = appModel.rpcModel.painting.advancedColorPalletModel.colorEntityDictionary[cb.id] {
+                                    entity2.removeFromParent()
+                                }
+                            }
+                        }
+                    }
+                    appModel.rpcModel.painting.advancedColorPalletModel.selectedBasicColorName = ""
+                }
+            }
+            if appModel.rpcModel.painting.advancedColorPalletModel.colorDictionary[name] != nil {
+                if let colorEntity = appModel.rpcModel.painting.advancedColorPalletModel.colorEntityDictionary[name] {
+                    if colorBall.isBasic {
+                        colorEntity.setScale(SIMD3<Float>(repeating: 0.013), relativeTo: nil)
+                        let subColorBalls: [ColorBall] = appModel.rpcModel.painting.advancedColorPalletModel.colorBalls.filterByID(containing: String(name.prefix(1)), isBasic: false)
+                        for cb: ColorBall in subColorBalls {
+                            if let entity2: Entity =
+                                appModel.rpcModel.painting.advancedColorPalletModel.colorEntityDictionary[cb.id] {
+                                appModel.rpcModel.painting.advancedColorPalletModel.colorPalletEntity.addChild(entity2)
+                            }
+                        }
+                        appModel.rpcModel.painting.advancedColorPalletModel.selectedBasicColorName = name
+                    }
+                }
+            }
+            
             if let color: UIColor =
                 appModel.rpcModel.painting.advancedColorPalletModel.colorDictionary[name] {
-                let material = SimpleMaterial(color: color, isMetallic: false)
+                let material: SimpleMaterial = SimpleMaterial(color: color, isMetallic: false)
                 finger.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [material]))
             }
         }
@@ -365,7 +411,7 @@ extension ImmersiveView {
             appModel.model.iconEntity.orientation = simd_quatf(angle: 0, axis: SIMD3(1, 0, 0))
             appModel.model.iconEntity.transform.translation.y -= 0.01
             if appModel.model.recordTime(isBegan: false) {
-                let cleaned = appModel.rpcModel.painting.paintingCanvas.strokes.removingShortStrokes(minPoints: 3)
+                let cleaned: [Stroke] = appModel.rpcModel.painting.paintingCanvas.strokes.removingShortStrokes(minPoints: 3)
                 if cleaned.isEmpty { return }
                 appModel.externalStrokeFileWapper.writeStroke(
                     strokes: cleaned,
@@ -391,7 +437,7 @@ extension ImmersiveView {
     // MARK: — Began-handlers
     private func didTouchColor(_ name: String, finger: Entity) {
         appModel.model.changeFingerColor(entity: finger, colorName: name)
-        appModel.rpcModel.painting.paintingCanvas.setMaxRadius(radius: 0.01)
+        appModel.rpcModel.painting.paintingCanvas.setMaxRadius(userId: appModel.mcPeerIDUUIDWrapper.myId, radius: 0.01)
         appModel.model.isEraserMode = false
     }
     
@@ -400,20 +446,25 @@ extension ImmersiveView {
             RequestSchema(
                 peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
                 method: .changeFingerLineWidth,
-                param: .changeFingerLineWidth(.init(toolName: name))
+                param: .changeFingerLineWidth(
+                    .init(
+                        userId: appModel.mcPeerIDUUIDWrapper.myId,
+                        toolName: name
+                    )
+                )
             )
         )
         
-        let toolBall = appModel.rpcModel.painting.advancedColorPalletModel.toolBalls.get(withID: name)
-        if toolBall != nil {
-            let material: SimpleMaterial = SimpleMaterial(color: appModel.rpcModel.painting.paintingCanvas.activeColor, isMetallic: false)
-            finger.components.set(ModelComponent(mesh: .generateSphere(radius: Float(toolBall!.lineWidth)), materials: [material]))
+        if let toolBall: ToolBall = appModel.rpcModel.painting.advancedColorPalletModel.toolBalls.get(withID: name),
+           let activeColor: UIColor = appModel.rpcModel.painting.paintingCanvas.individualStrokeDic[appModel.mcPeerIDUUIDWrapper.myId]?.activeColor {
+            let material: SimpleMaterial = SimpleMaterial(color: activeColor, isMetallic: false)
+            finger.components.set(ModelComponent(mesh: .generateSphere(radius: Float(toolBall.lineWidth)), materials: [material]))
         }
         appModel.model.isEraserMode = false
     }
     
     private func activateEraser(finger: Entity) {
-        let eraserMat = SimpleMaterial(
+        let eraserMat: SimpleMaterial = SimpleMaterial(
             color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.2),
             isMetallic: true
         )
@@ -447,13 +498,13 @@ extension ImmersiveView {
             openWindow(id: "ExternalStroke")
         } else {
             print("FileManager is already active.")
-            for (id,affineMatrix) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                let transformedStrokes = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: Stroke) in
+            for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                let transformedStrokes: [Stroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: Stroke) in
                     // points 全てにアフィン変換を適用
                     let tmpRootTransfromPoints: [SIMD4<Float>] = stroke.points.map { (point: SIMD3<Float>) in
                         return stroke.entity.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
                     }
-                    let transformedPoints = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
+                    let transformedPoints: [SIMD3<Float>] = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
                         matmul4x4_4x1(affineMatrix, point)
                     }
                     return Stroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)

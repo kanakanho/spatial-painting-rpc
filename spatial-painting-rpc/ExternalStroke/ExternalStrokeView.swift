@@ -31,8 +31,8 @@ struct ExternalStrokeView: View {
                         selectedURL: $selectedURL
                     )
                     // 選択中のファイルを下部に表示
-                    if let url = selectedURL {
-                        let comps = url.pathComponents
+                    if let url: URL = selectedURL {
+                        let comps: [String] = url.pathComponents
                         Text("Selected: \(comps[comps.count - 2])")
                             .padding()
                             .frame(maxWidth: .infinity)
@@ -45,7 +45,7 @@ struct ExternalStrokeView: View {
                 // ファイル読み込み
                 Button("Delete File") {
                     // 選択されたファイルを削除
-                    if let selectedImageURL = selectedURL {
+                    if let selectedImageURL: URL = selectedURL {
                         appModel.externalStrokeFileWapper.deleteStroke(in: selectedImageURL)
                     }
                     fileList = appModel.externalStrokeFileWapper.listDirs().map { $0.lastPathComponent }.sorted(by: >)
@@ -72,8 +72,8 @@ struct ExternalStrokeView: View {
                         selectedURL: $selectedURL
                     )
                     // 選択中のファイルを下部に表示
-                    if let url = selectedURL {
-                        let comps = url.pathComponents
+                    if let url: URL = selectedURL {
+                        let comps: [String] = url.pathComponents
                         Text("Selected: \(comps[comps.count - 2])")
                             .padding()
                             .frame(maxWidth: .infinity)
@@ -88,7 +88,7 @@ struct ExternalStrokeView: View {
                     .padding(.bottom, 20)
                     .onChange(of: isLoading) {
                         if isLoading {
-                            if let comps = selectedURL?.pathComponents {
+                            if let comps: [String] = selectedURL?.pathComponents {
                                 selectedFile = comps[comps.count - 2]
                             }
                             if !selectedFile.isEmpty {
@@ -102,14 +102,14 @@ struct ExternalStrokeView: View {
                 
                 // ロードしたデータの確定
                 Button("Confirm Loaded Stroke") {
-                    for (id,affineMatrix) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                        let transformedStrokes = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: Stroke) in
+                    for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                        let transformedStrokes: [Stroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: Stroke) in
                             // points 全てにアフィン変換を適用
                             let tmpRootTransfromPoints: [SIMD4<Float>] = stroke.points.map { (point: SIMD3<Float>) in
                                 return stroke.entity.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
                             }
-                            let transformedPoints = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
-                                matmul4x4_4x1(affineMatrix, point)
+                            let transformedPoints: [SIMD3<Float>] = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
+                                return matmul4x4_4x1(affineMatrix, point)
                             }
                             return Stroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
                         })
@@ -152,15 +152,15 @@ struct ExternalStrokeView: View {
     
     /// Documents/StrokeCanvas 以下をスキャンして thumbnail.png を集める
     private func loadThumbnails() -> [URL] {
-        let docDir = FileManager.default
+        let docDir: URL = FileManager.default
             .urls(for: .documentDirectory, in: .userDomainMask)
             .first!
-        let canvasDir = docDir.appendingPathComponent("StrokeCanvas", isDirectory: true)
+        let canvasDir: URL = docDir.appendingPathComponent("StrokeCanvas", isDirectory: true)
         
         var urls: [URL] = []
         
-        for dir in fileList {
-            let thumb = canvasDir.appendingPathComponent(dir+"/thumbnail.png")
+        for dir: String in fileList {
+            let thumb: URL = canvasDir.appendingPathComponent(dir+"/thumbnail.png")
             if FileManager.default.fileExists(atPath: thumb.path) {
                 urls.append(thumb)
             }

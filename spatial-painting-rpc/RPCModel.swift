@@ -223,8 +223,8 @@ class RPCModel: ObservableObject {
             rpcResult = coordinateTransforms.setTransform(param: p)
         case let (.coordinateTransformEntity(.setState), .coordinateTransformEntity(.setState(p))):
             rpcResult = coordinateTransforms.setState(param: p)
-        case (.paintingEntity(.finishStroke),.paintingEntity(.finishStroke(_))):
-            painting.finishStroke()
+        case let (.paintingEntity(.finishStroke),.paintingEntity(.finishStroke(p))):
+            painting.finishStroke(param: p)
         case let
             (.paintingEntity(.setStrokeColor),.paintingEntity(.setStrokeColor(p))):
             painting.setStrokeColor(param: p)
@@ -305,8 +305,8 @@ class RPCModel: ObservableObject {
             rpcResult = coordinateTransforms.setState(param: p)
         case let (.paintingEntity(.addStrokePoint),.paintingEntity(.addStrokePoint(p))):
             painting.addStrokePoint(param: p)
-        case  (.paintingEntity(.finishStroke),.paintingEntity(.finishStroke(_))):
-            painting.finishStroke()
+        case let (.paintingEntity(.finishStroke),.paintingEntity(.finishStroke(p))):
+            painting.finishStroke(param: p)
         case let (.paintingEntity(.addStrokes),.paintingEntity(.addStrokes(p))):
             painting.addStrokes(param: p)
         case let

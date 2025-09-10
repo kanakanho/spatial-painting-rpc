@@ -8,6 +8,14 @@
 import SwiftUI
 import RealityKit
 
+struct IndividualStroke {
+    var currentStroke: Stroke?
+    var currentPosition: SIMD3<Float> = .zero
+    var isFirstStroke: Bool = true
+    var activeColor: SimpleMaterial.Color = SimpleMaterial.Color.white
+    var maxRadius: Float = 1E-2
+}
+
 /// A class that stores each stroke and generates a mesh, in real time, from a person's gesture movement.
 class PaintingCanvas {
     /// The main root entity for the painting canvas.
@@ -27,20 +35,14 @@ class PaintingCanvas {
     var boundingBoxCenter: SIMD3<Float> = .zero
     
     /// The stroke that a person creates.
-    var currentStroke: Stroke?
-    
-    var activeColor = SimpleMaterial.Color.white
-    
-    var maxRadius: Float = 1E-2
+    /// UUID : UserId
+    var individualStrokeDic: [UUID: IndividualStroke] = [:]
     
     /// The distance for the box that extends in the positive direction.
     let big: Float = 1E2
     
     /// The distance for the box that extends in the negative direction.
     let small: Float = 1E-2
-    
-    var currentPosition: SIMD3<Float> = .zero
-    var isFirstStroke = true
     
     // Sets up the painting canvas with six collision boxes that stack on each other.
     init() {
@@ -91,32 +93,48 @@ class PaintingCanvas {
         return box
     }
     
-    func setActiveColor(color: SimpleMaterial.Color) {
-        activeColor = color
+    func setActiveColor(userId: UUID ,color: SimpleMaterial.Color) {
+        if let individualStroke: IndividualStroke = individualStrokeDic[userId] {
+            var newIndividualStroke = individualStroke
+            newIndividualStroke.activeColor = color
+            individualStrokeDic[userId] = newIndividualStroke
+        } else {
+            individualStrokeDic[userId] = IndividualStroke(activeColor: color)
+        }
     }
     
-    func setMaxRadius(radius: Float) {
-        maxRadius = radius
+    func setMaxRadius(userId: UUID,radius: Float) {
+        if let individualStroke: IndividualStroke = individualStrokeDic[userId] {
+            var newIndividualStroke = individualStroke
+            newIndividualStroke.maxRadius = radius
+            individualStrokeDic[userId] = newIndividualStroke
+        } else {
+            individualStrokeDic[userId] = IndividualStroke(maxRadius: radius)
+        }
     }
     
     func setEraserEntity(_ entity: Entity) {
         eraserEntity = entity
     }
     
-    /// Generate a point when the user uses the drag gesture.
-    func addPoint(_ uuid: UUID, _ position: SIMD3<Float>) {
-        if isFirstStroke {
-            isFirstStroke = false
+    /// Generate a point when the individual uses the drag gesture.
+    func addPoint(_ strokeId: UUID, _ position: SIMD3<Float>, userId: UUID) {
+        var individualStroke: IndividualStroke = individualStrokeDic[userId] ?? IndividualStroke()
+        
+        if individualStroke.isFirstStroke {
+            individualStroke.isFirstStroke = false
+            individualStrokeDic[userId] = individualStroke
             return
         }
         
         /// currentPosition との距離が一定以上離れている場合は早期リターンする
-        let distance = length(position - currentPosition)
-        currentPosition = position
+        let distance = length(position - individualStroke.currentPosition)
+        individualStroke.currentPosition = position
         //print("distance: \(distance)")
         if distance > 0.1 {
             //print("distance is too far, return")
-            currentStroke = nil
+            individualStroke.currentStroke = nil
+            individualStrokeDic[userId] = individualStroke
             return
         }
         
@@ -124,37 +142,44 @@ class PaintingCanvas {
         let threshold: Float = 1E-9
         
         // Start a new stroke if no stroke exists.
-        if currentStroke == nil {
-            currentStroke = Stroke(uuid: uuid)
-            currentStroke!.setActiveColor(color: activeColor)
-            currentStroke!.setMaxRadius(radius: maxRadius)
-            strokes.append(currentStroke!)
+        if individualStroke.currentStroke == nil {
+            individualStroke.currentStroke = Stroke(uuid: strokeId)
+            individualStroke.currentStroke!.setActiveColor(color: individualStroke.activeColor)
+            individualStroke.currentStroke!.setMaxRadius(radius: individualStroke.maxRadius)
+            strokes.append(individualStroke.currentStroke!)
             
             // Add the stroke to the root.
-            root.addChild(currentStroke!.entity)
+            root.addChild(individualStroke.currentStroke!.entity)
         }
         
         // Check whether the length between the current hand position and the previous point meets the threshold.
-        if let previousPoint = currentStroke?.points.last, length(position - previousPoint) < threshold {
+        if let previousPoint = individualStroke.currentStroke?.points.last, length(position - previousPoint) < threshold {
             return
         }
         
         // Add the current position to the stroke.
-        currentStroke?.points.append(position)
+        individualStroke.currentStroke?.points.append(position)
         
         // Update the current stroke mesh.
-        currentStroke?.updateMesh()
+        individualStroke.currentStroke?.updateMesh()
+        
+        individualStrokeDic[userId] = individualStroke
     }
     
     /// Clear the stroke when the drag gesture ends.
-    func finishStroke() {
-        if let stroke = currentStroke {
+    func finishStroke(_ uuid: UUID) {
+        guard var individualStroke: IndividualStroke = individualStrokeDic[uuid] else {
+            return
+        }
+        
+        if let stroke = individualStroke.currentStroke {
             //print("finish stroke")
             // Trigger the update mesh operation.
             if stroke.points.count < 4 {
                 strokes.removeAll { $0.uuid == stroke.uuid }
                 stroke.entity.removeFromParent()
-                currentStroke = nil
+                individualStroke.currentStroke = nil
+                individualStrokeDic[uuid] = individualStroke
                 return
             }
             stroke.updateMesh()
@@ -176,7 +201,9 @@ class PaintingCanvas {
             }
             
             // Clear the current stroke.
-            currentStroke = nil
+            individualStroke.currentStroke = nil
+            
+            individualStrokeDic[uuid] = individualStroke
         }
     }
     

@@ -46,7 +46,7 @@ class Stroke: Codable {
     }
     
     /// The number of points in each ring of the mesh.
-    let pointsPerRing = 8
+    let pointsPerRing = 4
     
     init(uuid: UUID, originalMaxRadius: Float = 1E-2) {
         self.uuid = uuid
@@ -186,29 +186,26 @@ class Stroke: Codable {
     }
     
     /// Calculate the position and normal for a point in the ring around a stroke point.
-    private func calculatePositionAndNormal(
-        pointI: Int, point: Int, radius: Float, xAxis: SIMD3<Float>, yAxis: SIMD3<Float>) -> (SIMD3<Float>, SIMD3<Float>) {
-            /// The angle is the product of two times pi, then divide the total points per ring.
-            let angle = 2 * .pi * Float(point) / Float(pointsPerRing)
-            
-            /// The current normal value from the angle.
-            let normal = cos(angle) * xAxis + sin(angle) * yAxis
-            
-            /// The location of the current point with its distance from the center point.
-            let position = (points[pointI] - points[0]) + radius * normal
-            
-            return (position, normal)
-        }
+    private func calculatePositionAndNormal(pointI: Int, point: Int, radius: Float, xAxis: SIMD3<Float>, yAxis: SIMD3<Float>) -> (SIMD3<Float>, SIMD3<Float>) {
+        /// The angle is the product of two times pi, then divide the total points per ring.
+        let angle: Float = 2 * .pi * Float(point) / Float(pointsPerRing)
+        
+        /// The current normal value from the angle.
+        let normal: SIMD3<Float> = cos(angle) * xAxis + sin(angle) * yAxis
+        
+        /// The location of the current point with its distance from the center point.
+        let position: SIMD3<Float> = (points[pointI] - points[0]) + radius * normal
+        
+        return (position, normal)
+    }
     
     /// Add triangle indices for the current point in the mesh.
     private func appendTriangles(pointIdx: Int, point: Int, triangles: inout [UInt32]) {
-        /// The collection of points in an array to define the shape for the mesh.
-        let quadIndices: [UInt32] = [
-            UInt32(pointsPerRing * (pointIdx + 0) + (point + 0) % pointsPerRing),
-            UInt32(pointsPerRing * (pointIdx + 1) + (point + 0) % pointsPerRing),
-            UInt32(pointsPerRing * (pointIdx + 0) + (point + 1) % pointsPerRing),
-            UInt32(pointsPerRing * (pointIdx + 1) + (point + 1) % pointsPerRing)
-        ]
+        let first: UInt32 = UInt32(pointsPerRing * (pointIdx) + (point) % pointsPerRing)
+        let second: UInt32 = UInt32(pointsPerRing * (pointIdx + 1) + (point) % pointsPerRing)
+        let third: UInt32 = UInt32(pointsPerRing * (pointIdx) + (point + 1) % pointsPerRing)
+        let fourth: UInt32 = UInt32(pointsPerRing * (pointIdx + 1) + (point + 1) % pointsPerRing)
+        let quadIndices: [UInt32] = [first, second, third, fourth]
         
         // Add the contents of the fourth, first, and third entry from the
         // `quadIndices` array to the `triangles` collection.

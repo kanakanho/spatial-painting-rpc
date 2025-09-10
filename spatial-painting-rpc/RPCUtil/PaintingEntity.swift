@@ -18,51 +18,7 @@ class Painting:ObservableObject {
     /// - Parameter strokeColorName: 色の名前
     func setStrokeColor(param: SetStrokeColorParam) {
         if let color: UIColor = advancedColorPalletModel.colorDictionary[param.strokeColorName] {
-            advancedColorPalletModel.colorPalletEntityDisable()
-            advancedColorPalletModel.setActiveColor(color: color)
-            paintingCanvas.setActiveColor(color: color)
-        }
-        
-        if advancedColorPalletModel.selectedBasicColorName == param.strokeColorName {
-            return
-        }
-        let colorBall = advancedColorPalletModel.colorBalls.get(withID: param.strokeColorName)
-        if colorBall == nil {
-            return
-        }
-        let prev = advancedColorPalletModel.selectedBasicColorName
-        if prev != "" {
-            if colorBall!.isBasic || param.strokeColorName.hasPrefix("m") {
-                if let prevEntity = advancedColorPalletModel.colorEntityDictionary[prev] {
-                    prevEntity.setScale(SIMD3<Float>(repeating: 0.01), relativeTo: nil)
-                    let colorBall2 = advancedColorPalletModel.colorBalls.get(withID: prev)
-                    if colorBall2 != nil {
-                        //print("Unselected color ball: \(colorBall2!.id)")
-                        let subColorBalls = advancedColorPalletModel.colorBalls.filterByID(containing: String(prev.prefix(1)), isBasic: false)
-                        for cb in subColorBalls {
-                            if let entity2: Entity = advancedColorPalletModel.colorEntityDictionary[cb.id] {
-                                entity2.removeFromParent()
-                            }
-                        }
-                    }
-                }
-                advancedColorPalletModel.selectedBasicColorName = ""
-            }
-        }
-        if let color: UIColor = advancedColorPalletModel.colorDictionary[param.strokeColorName] {
-            if let colorEntity = advancedColorPalletModel.colorEntityDictionary[param.strokeColorName] {
-                if colorBall!.isBasic {
-                    colorEntity.setScale(SIMD3<Float>(repeating: 0.013), relativeTo: nil)
-                    let subColorBalls = advancedColorPalletModel.colorBalls.filterByID(containing: String(param.strokeColorName.prefix(1)), isBasic: false)
-                    for cb in subColorBalls {
-                        if let entity2: Entity =
-                            advancedColorPalletModel.colorEntityDictionary[cb.id] {
-                            advancedColorPalletModel.colorPalletEntity.addChild(entity2)
-                        }
-                    }
-                    advancedColorPalletModel.selectedBasicColorName = param.strokeColorName
-                }
-            }
+            paintingCanvas.setActiveColor(userId: param.userId, color: color)
         }
     }
     
@@ -89,12 +45,12 @@ class Painting:ObservableObject {
     /// ストロークを描く
     /// - Parameter point: 描く座標
     func addStrokePoint(param: AddStrokePointParam) {
-        paintingCanvas.addPoint(param.uuid, param.point)
+        paintingCanvas.addPoint(param.uuid, param.point, userId: param.userId)
     }
     
     /// ストロークを終了する
-    func finishStroke() {
-        paintingCanvas.finishStroke()
+    func finishStroke(param: FinishStrokeParam) {
+        paintingCanvas.finishStroke(param.userId)
     }
     
     /// 複数のストロークを追加する
@@ -110,8 +66,7 @@ class Painting:ObservableObject {
         }
         advancedColorPalletModel.selectedToolName = param.toolName
         if let lineWidth = advancedColorPalletModel.toolBalls.get(withID: param.toolName)?.lineWidth {
-            advancedColorPalletModel.colorPalletEntityDisable()
-            paintingCanvas.setMaxRadius(radius: Float(lineWidth))
+            paintingCanvas.setMaxRadius(userId: param.userId, radius: Float(lineWidth))
         }
     }
 }
@@ -137,6 +92,7 @@ struct PaintingEntity: RPCEntity {
         case changeFingerLineWidth(ChangeFingerLineWidthParam)
         
         struct SetStrokeColorParam: Codable {
+            let userId: UUID
             let strokeColorName: String
         }
         
@@ -150,6 +106,7 @@ struct PaintingEntity: RPCEntity {
         struct AddStrokePointParam: Codable {
             let uuid: UUID
             let point: SIMD3<Float>
+            let userId: UUID
         }
         
         struct AddStrokesParam: Codable {
@@ -157,9 +114,11 @@ struct PaintingEntity: RPCEntity {
         }
         
         struct FinishStrokeParam: Codable {
+            let userId: UUID
         }
         
         struct ChangeFingerLineWidthParam: Codable {
+            let userId: UUID
             let toolName: String
         }
         
