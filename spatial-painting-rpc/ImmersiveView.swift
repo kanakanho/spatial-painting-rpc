@@ -84,6 +84,7 @@ struct ImmersiveView: View {
                         
                         if length(thumbPos - indexPos) < pinchThreshold {
                             lastIndexPose = indexPos
+                            root.components.set(LastIndexPoseComponent(position: indexPos))
                         }
                     }
                 }))

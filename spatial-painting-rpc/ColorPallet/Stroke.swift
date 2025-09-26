@@ -17,6 +17,87 @@ struct StrokeComponent: Component {
     }
 }
 
+struct StrokeAccuracyComponent: Component {
+    var uuid: UUID
+    var accuracyMeshData: [Stroke.AccuracyLevel: MeshResource.Contents]
+    var currentAccuracyLevel: Stroke.AccuracyLevel = .normal
+    
+    init(_ uuid: UUID, accuracyMeshData: [Stroke.AccuracyLevel: MeshResource.Contents] = [:]) {
+        self.uuid = uuid
+        self.accuracyMeshData = accuracyMeshData
+    }
+}
+
+struct LastIndexPoseComponent: Component {
+    var position: SIMD3<Float>
+}
+
+class StrokeSystem: System {
+    static let strokeAccuracyQuery = EntityQuery(where: .has(StrokeAccuracyComponent.self))
+    static let lastIndexPoseQuery = EntityQuery(where: .has(LastIndexPoseComponent.self))
+    var lastIndexPose: SIMD3<Float> = .zero
+    static let threshold: Float = 0.5
+    required init(scene: RealityKit.Scene) {}
+    
+    func update(context: SceneUpdateContext) {
+        // 最新の指の位置を取得
+        let lastIndexPoseEntity: QueryResult<Entity> = context.entities(matching: Self.lastIndexPoseQuery, updatingSystemWhen: .rendering)
+        guard let entity = lastIndexPoseEntity.first(where: { _ in true }),
+              let newLastIndexPose = entity.components[LastIndexPoseComponent.self]?.position else {
+            return
+        }
+        
+        // 動いていなければ変更しない
+        if distance(lastIndexPose, newLastIndexPose) < Self.threshold {
+            return
+        }
+        lastIndexPose = newLastIndexPose
+        
+        let entities = context.entities(matching: Self.strokeAccuracyQuery, updatingSystemWhen: .rendering)
+        for entity in entities{
+            // 必要なコンポーネントを一度に取得する
+            guard var strokeAccuracy = entity.components[StrokeAccuracyComponent.self],
+                  let model = entity.components[ModelComponent.self] else {
+                continue
+            }
+            
+            let far: Float = distance(entity.position, lastIndexPose)
+            
+            // pixelsPerMeterに基づいて、どの精度のメッシュが必要かを決定する
+            let requiredLevel: Stroke.AccuracyLevel
+            if far > 4.0 {
+                requiredLevel = .min
+            } else if far > 2.0 {
+                requiredLevel = .middle
+            } else {
+                requiredLevel = .normal
+            }
+            
+            // 要求される精度レベルが、現在表示しているレベルと同じなら、何もしない
+            guard requiredLevel != strokeAccuracy.currentAccuracyLevel else {
+                continue
+            }
+            
+            // 要求レベルに対応するメッシュデータを取得
+            guard let newMeshContents = strokeAccuracy.accuracyMeshData[requiredLevel] else {
+                continue
+            }
+            
+            // メッシュを入れ替える
+            do {
+                print(strokeAccuracy.uuid, requiredLevel)
+                try model.mesh.replace(with: newMeshContents)
+                
+                // 状態を更新して、次回の無駄な処理を防ぐ
+                strokeAccuracy.currentAccuracyLevel = requiredLevel
+                entity.components.set(strokeAccuracy)
+            } catch {
+                print("Error replacing mesh for \(strokeAccuracy.uuid): \(error.localizedDescription)")
+            }
+        }
+    }
+}
+
 /// A structure to represent the stroke.
 class Stroke: Codable {
     var uuid: UUID
@@ -48,10 +129,18 @@ class Stroke: Codable {
     /// The number of points in each ring of the mesh.
     let pointsPerRing = 4
     
+    enum AccuracyLevel: Int, CaseIterable {
+        case min = 2
+        case middle = 3
+        case normal = 4
+    }
+    var accuracyMeshData: [AccuracyLevel: MeshResource.Contents] = [:]
+    
     init(uuid: UUID, originalMaxRadius: Float = 1E-2) {
         self.uuid = uuid
         self.maxRadius = originalMaxRadius
         entity.components.set(StrokeComponent(uuid))
+        entity.components.set(StrokeAccuracyComponent(uuid))
     }
     
     //修正 by nagao 2025/7/15
@@ -113,6 +202,27 @@ class Stroke: Codable {
             entity.setTransformMatrix(.identity, relativeTo: nil)
             entity.setPosition(center, relativeTo: nil)
         }
+        
+        for accuracy in AccuracyLevel.allCases {
+            let (positions, normals, triangles) = generateLessMeshData(lessPointsPerRing: accuracy.rawValue)
+            /// The `MeshResource.Contents` instance.
+            var contents = MeshResource.Contents()
+            
+            // Create and assign an instance to `contents`.
+            contents.instances = [MeshResource.Instance(id: "main", model: "model")]
+            
+            // Create the part for the model, and set the vertex positions, triangle indices, and normals.
+            var part = MeshResource.Part(id: "part", materialIndex: 0)
+            part.positions = MeshBuffer(positions)
+            part.triangleIndices = MeshBuffer(triangles)
+            part.normals = MeshBuffer(normals)
+            
+            // Create and assign a model that consists of the `part`.
+            contents.models = [MeshResource.Model(id: "model", parts: [part])]
+            
+            accuracyMeshData[accuracy] = contents
+        }
+        entity.components.set(StrokeAccuracyComponent(uuid, accuracyMeshData: accuracyMeshData))
     }
     
     // MARK: Helper functions
@@ -275,5 +385,78 @@ class Stroke: Codable {
         activeColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
         try container.encode([hue, saturation, brightness, alpha], forKey: .activeColor)
         try container.encode(maxRadius, forKey: .maxRadius)
+    }
+    
+    // MARK: Helper functions
+    
+    /// Generate the mesh data with the current points.
+    private func generateLessMeshData(lessPointsPerRing: Int) -> ([SIMD3<Float>], [SIMD3<Float>], [UInt32]) {
+        /// The array to store vertex positions.
+        var positions: [SIMD3<Float>] = []
+        
+        /// The array to store normal vectors.
+        var normals: [SIMD3<Float>] = []
+        
+        /// The array to store triangle indices.
+        var triangles: [UInt32] = []
+        
+        // Iterates through the points to create a path for the mesh.
+        for pointIdx in 0..<points.count {
+            /// The radius and direction for the current point.
+            let (radius, direction) = calculateRadiusAndDirection(at: pointIdx)
+            
+            /// The x and y axes for the current point.
+            let (xAxis, yAxis) = calculateAxes(direction: direction)
+            
+            // Generate points around the current stroke point.
+            for point in 0..<lessPointsPerRing {
+                /// The position and normal for the current point in the ring.
+                let (position, normal) = calculatePositionAndNormal(pointI: pointIdx, point: point, radius: radius, xAxis: xAxis, yAxis: yAxis, lessPointsPerRing: lessPointsPerRing)
+                
+                // Attach the position to the positions collection.
+                positions.append(position)
+                
+                // Attach the normal to the normals collection.
+                normals.append(normal)
+                
+                // Generate a mesh between each point.
+                if pointIdx + 1 < points.count {
+                    appendTriangles(pointIdx: pointIdx, point: point, lessPointsPerRing: lessPointsPerRing, triangles: &triangles)
+                }
+            }
+        }
+        
+        return (positions, normals, triangles)
+    }
+    
+    /// Calculate the position and normal for a point in the ring around a stroke point.
+    private func calculatePositionAndNormal(pointI: Int, point: Int, radius: Float, xAxis: SIMD3<Float>, yAxis: SIMD3<Float>, lessPointsPerRing: Int) -> (SIMD3<Float>, SIMD3<Float>) {
+        /// The angle is the product of two times pi, then divide the total points per ring.
+        let angle: Float = 2 * .pi * Float(point) / Float(lessPointsPerRing)
+        
+        /// The current normal value from the angle.
+        let normal: SIMD3<Float> = cos(angle) * xAxis + sin(angle) * yAxis
+        
+        /// The location of the current point with its distance from the center point.
+        let position: SIMD3<Float> = (points[pointI] - points[0]) + radius * normal
+        
+        return (position, normal)
+    }
+    
+    /// Add triangle indices for the current point in the mesh.
+    private func appendTriangles(pointIdx: Int, point: Int, lessPointsPerRing: Int, triangles: inout [UInt32]) {
+        let first: UInt32 = UInt32(pointsPerRing * (pointIdx) + (point) % lessPointsPerRing)
+        let second: UInt32 = UInt32(pointsPerRing * (pointIdx + 1) + (point) % lessPointsPerRing)
+        let third: UInt32 = UInt32(pointsPerRing * (pointIdx) + (point + 1) % lessPointsPerRing)
+        let fourth: UInt32 = UInt32(pointsPerRing * (pointIdx + 1) + (point + 1) % lessPointsPerRing)
+        let quadIndices: [UInt32] = [first, second, third, fourth]
+        
+        // Add the contents of the fourth, first, and third entry from the
+        // `quadIndices` array to the `triangles` collection.
+        triangles.append(contentsOf: [quadIndices[3], quadIndices[0], quadIndices[2]])
+        
+        // Add the contents of the fourth, second, and first entry from the
+        // `quadIndices` array to the `trinagles` collection.
+        triangles.append(contentsOf: [quadIndices[3], quadIndices[1], quadIndices[0]])
     }
 }

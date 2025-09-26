@@ -62,6 +62,8 @@ class PaintingCanvas {
             mass: 0.0)
         boundingBoxEntity.name = "boundingBox"
         boundingBoxEntity.components.set(InputTargetComponent(allowedInputTypes: .indirect))
+        
+        StrokeSystem.registerSystem()
     }
     
     func reset() {
