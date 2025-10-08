@@ -56,12 +56,13 @@ class StrokeSystem: System {
         let entities = context.entities(matching: Self.strokeAccuracyQuery, updatingSystemWhen: .rendering)
         for entity in entities{
             // 必要なコンポーネントを一度に取得する
-            guard var strokeAccuracy = entity.components[StrokeAccuracyComponent.self],
-                  let model = entity.components[ModelComponent.self] else {
+            guard var strokeAccuracy = entity.components[StrokeAccuracyComponent.self] else {
                 continue
             }
             
-            let far: Float = distance(entity.position, lastIndexPose)
+//            let far: Float = distance(entity.position, lastIndexPose)
+            // x-z 平面上でのユークリッド距離を測る
+            let far: Float = length(SIMD2<Float>(entity.position.x - lastIndexPose.x, entity.position.z - lastIndexPose.z))
             
             // pixelsPerMeterに基づいて、どの精度のメッシュが必要かを決定する
             let requiredLevel: Stroke.AccuracyLevel
@@ -85,8 +86,7 @@ class StrokeSystem: System {
             
             // メッシュを入れ替える
             do {
-                print(strokeAccuracy.uuid, requiredLevel)
-                try model.mesh.replace(with: newMeshContents)
+                try entity.model?.mesh.replace(with: newMeshContents)
                 
                 // 状態を更新して、次回の無駄な処理を防ぐ
                 strokeAccuracy.currentAccuracyLevel = requiredLevel
@@ -134,7 +134,6 @@ class Stroke: Codable {
         case middle = 3
         case normal = 4
     }
-    var accuracyMeshData: [AccuracyLevel: MeshResource.Contents] = [:]
     
     init(uuid: UUID, originalMaxRadius: Float = 1E-2) {
         self.uuid = uuid
@@ -203,6 +202,8 @@ class Stroke: Codable {
             entity.setPosition(center, relativeTo: nil)
         }
         
+        var tmpAccuracyMeshData: [AccuracyLevel: MeshResource.Contents] = [:]
+        
         for accuracy in AccuracyLevel.allCases {
             let (positions, normals, triangles) = generateLessMeshData(lessPointsPerRing: accuracy.rawValue)
             /// The `MeshResource.Contents` instance.
@@ -220,9 +221,9 @@ class Stroke: Codable {
             // Create and assign a model that consists of the `part`.
             contents.models = [MeshResource.Model(id: "model", parts: [part])]
             
-            accuracyMeshData[accuracy] = contents
+            tmpAccuracyMeshData[accuracy] = contents
         }
-        entity.components.set(StrokeAccuracyComponent(uuid, accuracyMeshData: accuracyMeshData))
+        entity.components.set(StrokeAccuracyComponent(uuid, accuracyMeshData: tmpAccuracyMeshData))
     }
     
     // MARK: Helper functions
@@ -406,7 +407,16 @@ class Stroke: Codable {
             let (radius, direction) = calculateRadiusAndDirection(at: pointIdx)
             
             /// The x and y axes for the current point.
-            let (xAxis, yAxis) = calculateAxes(direction: direction)
+            let xAxis: SIMD3<Float>
+            let yAxis: SIMD3<Float>
+
+            /// lessPointsPerRing が 2 のとき、y軸に対して並行になるようにメッシュを貼る
+            if lessPointsPerRing == 2 {
+                xAxis = SIMD3<Float>(0, 1, 0)
+                yAxis = .zero
+            } else {
+                (xAxis, yAxis) = calculateAxes(direction: direction)
+            }
             
             // Generate points around the current stroke point.
             for point in 0..<lessPointsPerRing {
@@ -445,10 +455,10 @@ class Stroke: Codable {
     
     /// Add triangle indices for the current point in the mesh.
     private func appendTriangles(pointIdx: Int, point: Int, lessPointsPerRing: Int, triangles: inout [UInt32]) {
-        let first: UInt32 = UInt32(pointsPerRing * (pointIdx) + (point) % lessPointsPerRing)
-        let second: UInt32 = UInt32(pointsPerRing * (pointIdx + 1) + (point) % lessPointsPerRing)
-        let third: UInt32 = UInt32(pointsPerRing * (pointIdx) + (point + 1) % lessPointsPerRing)
-        let fourth: UInt32 = UInt32(pointsPerRing * (pointIdx + 1) + (point + 1) % lessPointsPerRing)
+        let first: UInt32 = UInt32(lessPointsPerRing * (pointIdx) + (point) % lessPointsPerRing)
+        let second: UInt32 = UInt32(lessPointsPerRing * (pointIdx + 1) + (point) % lessPointsPerRing)
+        let third: UInt32 = UInt32(lessPointsPerRing * (pointIdx) + (point + 1) % lessPointsPerRing)
+        let fourth: UInt32 = UInt32(lessPointsPerRing * (pointIdx + 1) + (point + 1) % lessPointsPerRing)
         let quadIndices: [UInt32] = [first, second, third, fourth]
         
         // Add the contents of the fourth, first, and third entry from the
