@@ -60,7 +60,7 @@ class StrokeSystem: System {
                 continue
             }
             
-//            let far: Float = distance(entity.position, lastIndexPose)
+            //            let far: Float = distance(entity.position, lastIndexPose)
             // x-z 平面上でのユークリッド距離を測る
             let far: Float = length(SIMD2<Float>(entity.position.x - lastIndexPose.x, entity.position.z - lastIndexPose.z))
             
@@ -223,6 +223,17 @@ class Stroke: Codable {
             
             tmpAccuracyMeshData[accuracy] = contents
         }
+        // 精度を下げない場合の処理
+        if let bounds = entity.model?.mesh.bounds {
+            let boundsSize = bounds.max - bounds.min
+            let boundsLength = length(boundsSize)
+            let threshold: Float = 0.015
+            let minRequiredPointCount = Int(boundsLength / threshold)
+            if points.count < minRequiredPointCount {
+                tmpAccuracyMeshData[.min] = tmpAccuracyMeshData[.middle]
+            }
+        }
+        
         entity.components.set(StrokeAccuracyComponent(uuid, accuracyMeshData: tmpAccuracyMeshData))
     }
     
@@ -409,7 +420,7 @@ class Stroke: Codable {
             /// The x and y axes for the current point.
             let xAxis: SIMD3<Float>
             let yAxis: SIMD3<Float>
-
+            
             /// lessPointsPerRing が 2 のとき、y軸に対して並行になるようにメッシュを貼る
             if lessPointsPerRing == 2 {
                 xAxis = SIMD3<Float>(0, 1, 0)
