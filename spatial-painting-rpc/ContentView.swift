@@ -35,7 +35,7 @@ struct ContentView: View {
             
             ToggleImmersiveSpaceButton()
                 .environmentObject(appModel)
-                .disabled(!isStartImmersiveSpace)
+//                .disabled(!isStartImmersiveSpace)
             NavigationStack {
                 switch sharedCoordinateState {
                 case .prepare:
@@ -54,6 +54,10 @@ struct ContentView: View {
                 }
             }
             Spacer()
+            
+            Button("Control Mode") {
+                appModel.rpcModel.painting.paintingCanvas.isControlModeToggle()
+            }
         }
         .padding()
         .onAppear() {

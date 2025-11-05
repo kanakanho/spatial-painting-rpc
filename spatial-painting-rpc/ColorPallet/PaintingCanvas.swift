@@ -9,7 +9,7 @@ import SwiftUI
 import RealityKit
 
 struct IndividualStroke {
-    var currentStroke: Stroke?
+    var currentStroke: BezierStroke?
     var currentPosition: SIMD3<Float> = .zero
     var isFirstStroke: Bool = true
     var activeColor: SimpleMaterial.Color = SimpleMaterial.Color.white
@@ -21,9 +21,9 @@ class PaintingCanvas {
     /// The main root entity for the painting canvas.
     let root = Entity()
     
-    var strokes: [Stroke] = []
+    var strokes: [BezierStroke] = []
     let tmpRoot = Entity()
-    var tmpStrokes: [Stroke] = []
+    var tmpStrokes: [BezierStroke] = []
     var tmpBoundingBoxEntity: Entity = Entity()
     var tmpBoundingBox: BoundingBoxCube = BoundingBoxCube()
     
@@ -37,6 +37,9 @@ class PaintingCanvas {
     /// The stroke that a person creates.
     /// UUID : UserId
     var individualStrokeDic: [UUID: IndividualStroke] = [:]
+    
+    /// Whether it is in control mode.
+    var isControlMode: Bool = false
     
     /// The distance for the box that extends in the positive direction.
     let big: Float = 1E2
@@ -143,13 +146,13 @@ class PaintingCanvas {
         
         // Start a new stroke if no stroke exists.
         if individualStroke.currentStroke == nil {
-            individualStroke.currentStroke = Stroke(uuid: strokeId)
+            individualStroke.currentStroke = BezierStroke(uuid: strokeId)
             individualStroke.currentStroke!.setActiveColor(color: individualStroke.activeColor)
             individualStroke.currentStroke!.setMaxRadius(radius: individualStroke.maxRadius)
             strokes.append(individualStroke.currentStroke!)
             
             // Add the stroke to the root.
-            root.addChild(individualStroke.currentStroke!.entity)
+            root.addChild(individualStroke.currentStroke!.root)
         }
         
         // Check whether the length between the current hand position and the previous point meets the threshold.
@@ -177,12 +180,16 @@ class PaintingCanvas {
             // Trigger the update mesh operation.
             if stroke.points.count < 4 {
                 strokes.removeAll { $0.uuid == stroke.uuid }
-                stroke.entity.removeFromParent()
+                stroke.root.removeFromParent()
                 individualStroke.currentStroke = nil
                 individualStrokeDic[uuid] = individualStroke
                 return
             }
-            stroke.updateMesh()
+//            stroke.updateMesh()
+            stroke.finishRemesh()
+            for i in 0..<stroke.bezierPoints.count {
+                individualStroke.currentStroke?.root.addChild(stroke.bezierPoints[i].root)
+            }
             
             var count = 0
             for point in stroke.points {
@@ -200,6 +207,10 @@ class PaintingCanvas {
                 count += 1
             }
             
+            individualStroke.currentStroke?.bezierPoints.forEach {
+                $0.root.isEnabled = false
+            }
+            
             // Clear the current stroke.
             individualStroke.currentStroke = nil
             
@@ -207,14 +218,75 @@ class PaintingCanvas {
         }
     }
     
-    func addStrokes(_ strokes: [Stroke]) {
+    func isControlModeToggle() {
+        isControlMode.toggle()
+        if isControlMode {
+            startControlMode()
+        } else {
+            finishControlMode()
+        }
+    }
+    
+    func startControlMode() {
+        for stroke in strokes {
+            for bezierPoint in stroke.bezierPoints {
+                bezierPoint.root.isEnabled = true
+            }
+        }
+    }
+    
+    func finishControlMode() {
+        for stroke in strokes {
+            for bezierPoint in stroke.bezierPoints {
+                bezierPoint.root.isEnabled = false
+            }
+        }
+    }
+    
+    func moveControlPoint(strokeId: UUID, controlPointId: UUID, controlType: BezierStroke.BezierPoint.PointType, newPosition: SIMD3<Float>) {
+        for stroke in strokes {
+            if stroke.uuid == strokeId {
+                stroke.bezierPoints.add(pointId: controlPointId, point: newPosition, pn: controlType)
+                stroke.updateMesh()
+            }
+        }
+    }
+    
+    func finishControlPoint(strokeId: UUID, controlPointId: UUID) {
+        for stroke in strokes {
+            if stroke.uuid == strokeId {
+                stroke.updateMesh()
+                
+                // 既存のEraserEntityを削除
+                root.children.removeAll(where: { $0.name == "clear" && $0.components[StrokeComponent.self]?.uuid == stroke.uuid })
+                
+                var count = 0
+                for point in stroke.points {
+                    if count % 5 == 0 {
+                        let entity = eraserEntity.clone(recursive: true)
+                        entity.name = "clear"
+                        var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
+                        invisibleMaterial.opacityThreshold = 1.0
+                        entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
+                        entity.components.set(StrokeComponent(stroke.uuid))
+                        entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
+                        entity.position = point
+                        root.addChild(entity)
+                    }
+                    count += 1
+                }
+            }
+        }
+    }
+    
+    func addStrokes(_ strokes: [BezierStroke]) {
         for stroke in strokes {
             addStroke(stroke)
         }
     }
     
-    func addStroke(_ stroke: Stroke) {
-        let newStroke = Stroke(uuid: stroke.uuid)
+    func addStroke(_ stroke: BezierStroke) {
+        let newStroke = BezierStroke(uuid: stroke.uuid)
         newStroke.maxRadius = stroke.maxRadius
         newStroke.setActiveColor(color: stroke.activeColor)
         newStroke.points = stroke.points
@@ -237,14 +309,14 @@ class PaintingCanvas {
         }
         
         strokes.append(newStroke)
-        root.addChild(newStroke.entity)
+        root.addChild(newStroke.root)
     }
 }
 
 /// 直接 Stroke を追加するときに行う処理の拡張
 extension PaintingCanvas {
     /// 一時的な Stroke をまとめて追加する modified by nagao 2015/7/10
-    func addTmpStrokes(_ strokes: [Stroke]) {
+    func addTmpStrokes(_ strokes: [BezierStroke]) {
         //print("load tmp strokes")
         for stroke in strokes {
             addTmpStroke(stroke)
@@ -258,10 +330,10 @@ extension PaintingCanvas {
         for stroke in tmpStrokes {
             stroke.points = stroke.points.map { (position:  SIMD3<Float>) in
                 // entityのローカル座標に変換する
-                return stroke.entity.convert(position: position, from: nil)
+                return stroke.root.convert(position: position, from: nil)
             }
-            stroke.entity.setPosition(stroke.entity.position - boundingBoxCenter, relativeTo: nil)
-            boundingBoxEntity.addChild(stroke.entity)
+            stroke.root.setPosition(stroke.root.position - boundingBoxCenter, relativeTo: nil)
+            boundingBoxEntity.addChild(stroke.root)
         }
         tmpRoot.addChild(boundingBoxEntity)
     }
@@ -289,8 +361,8 @@ extension PaintingCanvas {
     }
     
     /// 一時的な Stroke を追加する
-    func addTmpStroke(_ stroke: Stroke) {
-        let newStroke = Stroke(uuid: stroke.uuid, originalMaxRadius: stroke.originalMaxRadius)
+    func addTmpStroke(_ stroke: BezierStroke) {
+        let newStroke = BezierStroke(uuid: stroke.uuid, originalMaxRadius: stroke.originalMaxRadius)
         newStroke.maxRadius = stroke.maxRadius
         newStroke.setActiveColor(color: stroke.activeColor)
         newStroke.points = stroke.points
@@ -303,15 +375,15 @@ extension PaintingCanvas {
         if tmpStrokes.isEmpty { return }
         for stroke in tmpStrokes {
             stroke.points = stroke.points.map { (position: SIMD3<Float>) in
-                return SIMD3<Float>(stroke.entity.transformMatrix(relativeTo: nil) * SIMD4<Float>(position, 1.0))
+                return SIMD3<Float>(stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(position, 1.0))
             }
-            let newStroke = Stroke(uuid: stroke.uuid, originalMaxRadius: stroke.originalMaxRadius)
+            let newStroke = BezierStroke(uuid: stroke.uuid, originalMaxRadius: stroke.originalMaxRadius)
             newStroke.maxRadius = stroke.maxRadius
             newStroke.setActiveColor(color: stroke.activeColor)
             newStroke.points = stroke.points
             newStroke.updateMesh()
             strokes.append(newStroke)
-            root.addChild(newStroke.entity)
+            root.addChild(newStroke.root)
             
             var count = 0
             for point in stroke.points {

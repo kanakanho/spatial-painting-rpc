@@ -1,10 +1,11 @@
-/*
- See the LICENSE.txt file for this sample’s licensing information.
- 
- Abstract:
- A class that represents the stroke mesh that the drag gesture creates.
- */
+//
+//  BezierStroke.swift
+//  sample
+//
+//  Created by blueken on 2025/09/30.
+//
 
+import Foundation
 import SwiftUI
 import RealityKit
 import simd
@@ -17,8 +18,17 @@ struct StrokeComponent: Component {
     }
 }
 
-/// A structure to represent the stroke.
-class Stroke: Codable {
+struct StrokeRootComponent: Component {
+    var uuid: UUID
+    
+    init(_ uuid: UUID) {
+        self.uuid = uuid
+    }
+}
+
+
+@Observable
+class BezierStroke: Codable {
     var uuid: UUID
     
     var activeColor: SimpleMaterial.Color = SimpleMaterial.Color.red
@@ -28,7 +38,8 @@ class Stroke: Codable {
     }
     
     /// The stroke that represents the stroke.
-    var entity = Entity()
+    var root = Entity()
+    var stroke = Entity()
     
     /// The collection of points in 3D space that represent the stroke.
     var points: [SIMD3<Float>] = []
@@ -39,6 +50,10 @@ class Stroke: Codable {
     func setMaxRadius(radius: Float) {
         maxRadius = radius
     }
+    
+    var tmpBezier: BezierPoint
+    
+    var bezierPoints: [BezierPoint] = []
     
     /// 元の maxRadius を保持するプロパティを追加（初期値 1E-2）
     var originalMaxRadius: Float {
@@ -51,7 +66,10 @@ class Stroke: Codable {
     init(uuid: UUID, originalMaxRadius: Float = 1E-2) {
         self.uuid = uuid
         self.maxRadius = originalMaxRadius
-        entity.components.set(StrokeComponent(uuid))
+        self.tmpBezier = BezierPoint(strokeId: uuid)
+        stroke.components.set(StrokeComponent(uuid))
+        root.components.set(StrokeRootComponent(uuid))
+        root.addChild(stroke)
     }
     
     //修正 by nagao 2025/7/15
@@ -68,8 +86,17 @@ class Stroke: Codable {
     /// Update the mesh with the points of the stroke if it already exists,
     /// or create a new one with the given mesh data.
     func updateMesh() {
+        if !bezierPoints.beziers.isEmpty {
+            print("ポイントからベジェ化")
+            points = beziers2Points(beziers: bezierPoints.beziers, resolution: 16)
+        }
+
         /// The starting point where the stroke mesh begins.
-        guard let center = points.first else { return }
+        guard let center = points.first,
+              let last = points.last else { return }
+        
+        /// 最後の点を追加
+        points.append(last)
         
         /// The position, normals, and triangle indices that the points generate.
         let (positions, normals, triangles) = generateMeshData()
@@ -89,14 +116,16 @@ class Stroke: Codable {
         // Create and assign a model that consists of the `part`.
         contents.models = [MeshResource.Model(id: "model", parts: [part])]
         
-        // Replace the mesh with `contents` if there is a mesh component on the entity.
-        if let mesh = entity.model?.mesh {
+        // Replace the mesh with `contents` if there is a mesh component on the stroke.
+        if let mesh = stroke.model?.mesh {
+            print("Replace mesh")
             do {
                 try mesh.replace(with: contents)
             } catch {
                 print("Error replacing mesh: \(error.localizedDescription)")
             }
         } else {
+            print("Generate new mesh")
             /// The new mesh that generates with `content`.
             guard let mesh = try? MeshResource.generate(from: contents) else {
                 print("Error generating mesh")
@@ -104,15 +133,42 @@ class Stroke: Codable {
             }
             
             // Set the model component to the new mesh, and assign a simple material.
-            entity.components.set(ModelComponent(
+            stroke.components.set(ModelComponent(
                 mesh: mesh,
                 materials: [SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)]
             ))
-            
-            // Set the entity's transform and position.
-            entity.setTransformMatrix(.identity, relativeTo: nil)
-            entity.setPosition(center, relativeTo: nil)
         }
+        
+        // Set the stroke's transform and position.
+        stroke.setTransformMatrix(.identity, relativeTo: nil)
+        stroke.setPosition(center, relativeTo: nil)
+    }
+            
+    func points2MeshContents(poitns: [SIMD3<Float>]) -> MeshResource.Contents {
+        /// The position, normals, and triangle indices that the points generate.
+        let (positions, normals, triangles) = generateMeshData()
+        
+        /// The `MeshResource.Contents` instance.
+        var contents = MeshResource.Contents()
+        
+        // Create and assign an instance to `contents`.
+        contents.instances = [MeshResource.Instance(id: "main", model: "model")]
+        
+        // Create the part for the model, and set the vertex positions, triangle indices, and normals.
+        var part = MeshResource.Part(id: "part", materialIndex: 0)
+        part.positions = MeshBuffer(positions)
+        part.triangleIndices = MeshBuffer(triangles)
+        part.normals = MeshBuffer(normals)
+        
+        // Create and assign a model that consists of the `part`.
+        contents.models = [MeshResource.Model(id: "model", parts: [part])]
+        return contents
+    }
+    
+    ///
+    func finishRemesh() {
+        bezierPoints = points2Beziers(strokeId: uuid, points: points)
+        updateMesh()
     }
     
     // MARK: Helper functions
@@ -186,18 +242,19 @@ class Stroke: Codable {
     }
     
     /// Calculate the position and normal for a point in the ring around a stroke point.
-    private func calculatePositionAndNormal(pointI: Int, point: Int, radius: Float, xAxis: SIMD3<Float>, yAxis: SIMD3<Float>) -> (SIMD3<Float>, SIMD3<Float>) {
-        /// The angle is the product of two times pi, then divide the total points per ring.
-        let angle: Float = 2 * .pi * Float(point) / Float(pointsPerRing)
-        
-        /// The current normal value from the angle.
-        let normal: SIMD3<Float> = cos(angle) * xAxis + sin(angle) * yAxis
-        
-        /// The location of the current point with its distance from the center point.
-        let position: SIMD3<Float> = (points[pointI] - points[0]) + radius * normal
-        
-        return (position, normal)
-    }
+    private func calculatePositionAndNormal(
+        pointI: Int, point: Int, radius: Float, xAxis: SIMD3<Float>, yAxis: SIMD3<Float>) -> (SIMD3<Float>, SIMD3<Float>) {
+            /// The angle is the product of two times pi, then divide the total points per ring.
+            let angle = 2 * .pi * Float(point) / Float(pointsPerRing)
+            
+            /// The current normal value from the angle.
+            let normal = cos(angle) * xAxis + sin(angle) * yAxis
+            
+            /// The location of the current point with its distance from the center point.
+            let position = (points[pointI] - points[0]) + radius * normal
+            
+            return (position, normal)
+        }
     
     /// Add triangle indices for the current point in the mesh.
     private func appendTriangles(pointIdx: Int, point: Int, triangles: inout [UInt32]) {
@@ -225,18 +282,24 @@ class Stroke: Codable {
     // pointを変更しない
     public init(uuid: UUID, points: [SIMD3<Float>] = [], color: SimpleMaterial.Color = .white, maxRadius: Float = 1E-2) {
         self.uuid = uuid
+        self.tmpBezier = BezierPoint(strokeId: uuid)
         self.points = points
         self.activeColor = color
         self.maxRadius = maxRadius
-        entity.components.set(StrokeComponent(uuid))
+        stroke.components.set(StrokeComponent(uuid))
+        root.components.set(StrokeRootComponent(uuid))
+        root.addChild(stroke)
     }
     
     public init(uuid: UUID, points: [SIMD3<Float>] = [], color: CGColor = .init(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), maxRadius: Float = 1E-2) {
         self.uuid = uuid
+        self.tmpBezier = BezierPoint(strokeId: uuid)
         self.points = points
         self.activeColor = .init(cgColor: color)
         self.maxRadius = maxRadius
-        entity.components.set(StrokeComponent(uuid))
+        stroke.components.set(StrokeComponent(uuid))
+        root.components.set(StrokeRootComponent(uuid))
+        root.addChild(stroke)
     }
     
     required public init(from decoder: Decoder) throws {
@@ -260,8 +323,12 @@ class Stroke: Codable {
         }
         
         self.maxRadius = try container.decodeIfPresent(Float.self, forKey: .maxRadius) ?? 1E-2
-        self.uuid = UUID()
-        entity.components.set(StrokeComponent(uuid))
+        let uuid = UUID()
+        self.uuid = uuid
+        self.tmpBezier = BezierPoint(strokeId: uuid)
+        stroke.components.set(StrokeComponent(uuid))
+        root.components.set(StrokeRootComponent(uuid))
+        root.addChild(stroke)
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -277,3 +344,4 @@ class Stroke: Codable {
         try container.encode(maxRadius, forKey: .maxRadius)
     }
 }
+

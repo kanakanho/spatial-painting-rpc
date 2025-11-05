@@ -92,7 +92,7 @@ struct ExternalStrokeView: View {
                                 selectedFile = comps[comps.count - 2]
                             }
                             if !selectedFile.isEmpty {
-                                let strokes: [Stroke] = appModel.externalStrokeFileWapper.readStrokes(in: selectedFile)
+                                let strokes: [BezierStroke] = appModel.externalStrokeFileWapper.readStrokes(in: selectedFile)
                                 appModel.rpcModel.painting.paintingCanvas.addTmpStrokes(strokes)
                             }
                         } else {
@@ -103,15 +103,15 @@ struct ExternalStrokeView: View {
                 // ロードしたデータの確定
                 Button("Confirm Loaded Stroke") {
                     for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                        let transformedStrokes: [Stroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: Stroke) in
+                        let transformedStrokes: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: BezierStroke) in
                             // points 全てにアフィン変換を適用
                             let tmpRootTransfromPoints: [SIMD4<Float>] = stroke.points.map { (point: SIMD3<Float>) in
-                                return stroke.entity.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
+                                return stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
                             }
                             let transformedPoints: [SIMD3<Float>] = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
                                 return matmul4x4_4x1(affineMatrix, point)
                             }
-                            return Stroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
+                            return BezierStroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
                         })
                         _ = appModel.rpcModel.sendRequest(
                             .init(

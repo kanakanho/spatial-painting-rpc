@@ -29,12 +29,11 @@ class Painting:ObservableObject {
     
     /// 指定したUUIDを `StrokeComponent` に持つストロークを削除する
     func removeStroke(param: RemoveStrokeParam){
-        paintingCanvas.strokes.removeAll{ $0.entity.components[StrokeComponent.self]?.uuid == param.uuid
-        }
+        paintingCanvas.strokes.removeAll{ $0.root.components[StrokeRootComponent.self]?.uuid == param.uuid}
         
         DispatchQueue.main.async {
             let childrenToRemove = self.paintingCanvas.root.children.filter {
-                $0.components[StrokeComponent.self]?.uuid == param.uuid
+                $0.components[StrokeRootComponent.self]?.uuid == param.uuid
             }
             for child in childrenToRemove {
                 child.removeFromParent()
@@ -69,6 +68,24 @@ class Painting:ObservableObject {
             paintingCanvas.setMaxRadius(userId: param.userId, radius: Float(lineWidth))
         }
     }
+    
+    /// ベジェのストロークを編集する
+    func moveControlPoint(param: MoveControlPointParam) {
+        paintingCanvas.moveControlPoint(
+            strokeId: param.strokeId,
+            controlPointId: param.controlPointId,
+            controlType: param.controlType,
+            newPosition: param.newPosition
+        )
+    }
+    
+    /// ベジェのストロークの編集を終える
+    func finishControlPoint(param: FinishControlPointParam) {
+        paintingCanvas.finishControlPoint(
+            strokeId: param.strokeId,
+            controlPointId: param.controlPointId
+        )
+    }
 }
 
 struct PaintingEntity: RPCEntity {
@@ -80,6 +97,8 @@ struct PaintingEntity: RPCEntity {
         case addStrokes
         case finishStroke
         case changeFingerLineWidth
+        case moveControlPoint
+        case finishControlPoint
     }
     
     enum Param: RPCEntityParam {
@@ -90,6 +109,8 @@ struct PaintingEntity: RPCEntity {
         case addStrokes(AddStrokesParam)
         case finishStroke(FinishStrokeParam)
         case changeFingerLineWidth(ChangeFingerLineWidthParam)
+        case moveControlPoint(MoveControlPointParam)
+        case finishControlPoint(FinishControlPointParam)
         
         struct SetStrokeColorParam: Codable {
             let userId: UUID
@@ -110,7 +131,7 @@ struct PaintingEntity: RPCEntity {
         }
         
         struct AddStrokesParam: Codable {
-            let strokes: [Stroke]
+            let strokes: [BezierStroke]
         }
         
         struct FinishStrokeParam: Codable {
@@ -120,6 +141,18 @@ struct PaintingEntity: RPCEntity {
         struct ChangeFingerLineWidthParam: Codable {
             let userId: UUID
             let toolName: String
+        }
+        
+        struct MoveControlPointParam: Codable {
+            let strokeId: UUID
+            let controlPointId: UUID
+            let controlType: BezierStroke.BezierPoint.PointType
+            let newPosition: SIMD3<Float>
+        }
+        
+        struct FinishControlPointParam: Codable {
+            let strokeId: UUID
+            let controlPointId: UUID
         }
         
         func encode(to encoder: Encoder) throws {
@@ -139,6 +172,10 @@ struct PaintingEntity: RPCEntity {
                 try container.encode(param, forKey: .finishStroke)
             case .changeFingerLineWidth(let param):
                 try container.encode(param, forKey: .changeFingerLineWidth)
+            case .moveControlPoint(let param):
+                try container.encode(param, forKey: .moveControlPoint)
+            case .finishControlPoint(let param):
+                try container.encode(param, forKey: .finishControlPoint)
             }
         }
         
@@ -158,6 +195,10 @@ struct PaintingEntity: RPCEntity {
                 self = .finishStroke(param)
             } else if let param = try? container.decode(ChangeFingerLineWidthParam.self, forKey: .changeFingerLineWidth) {
                 self = .changeFingerLineWidth(param)
+            } else if let param = try? container.decode(MoveControlPointParam.self, forKey: .moveControlPoint) {
+                self = .moveControlPoint(param)
+            } else if let param = try? container.decode(FinishControlPointParam.self, forKey: .finishControlPoint) {
+                self = .finishControlPoint(param)
             } else {
                 throw DecodingError.dataCorruptedError(forKey: CodingKeys.setStrokeColor, in: container, debugDescription: "Invalid parameter type")
             }
@@ -171,6 +212,8 @@ struct PaintingEntity: RPCEntity {
             case addStrokes
             case finishStroke
             case changeFingerLineWidth
+            case moveControlPoint
+            case finishControlPoint
         }
     }
 }
@@ -182,3 +225,5 @@ typealias AddStrokePointParam = PaintingEntity.Param.AddStrokePointParam
 typealias AddStrokesParam = PaintingEntity.Param.AddStrokesParam
 typealias FinishStrokeParam = PaintingEntity.Param.FinishStrokeParam
 typealias ChangeFingerLineWidthParam = PaintingEntity.Param.ChangeFingerLineWidthParam
+typealias MoveControlPointParam = PaintingEntity.Param.MoveControlPointParam
+typealias FinishControlPointParam = PaintingEntity.Param.FinishControlPointParam

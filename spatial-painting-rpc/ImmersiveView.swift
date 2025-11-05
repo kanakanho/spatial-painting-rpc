@@ -131,6 +131,10 @@ struct ImmersiveView: View {
                 .simultaneously(with: MagnifyGesture())
                 .targetedToAnyEntity()
                 .onChanged({ (value: EntityTargetValue<SimultaneousGesture<DragGesture, MagnifyGesture>.Value>) in
+                    if appModel.rpcModel.painting.paintingCanvas.isControlMode {
+                        return
+                    }
+                    
                     if sourceTransform == nil {
                         sourceTransform = value.entity.transform
                     }
@@ -170,7 +174,7 @@ struct ImmersiveView: View {
                                 value.entity.transform.scale = [sourceTransform!.scale.x * magnification, sourceTransform!.scale.y * magnification, sourceTransform!.scale.z * magnification]
                                 
                                 value.entity.children.forEach { child in
-                                    appModel.rpcModel.painting.paintingCanvas.tmpStrokes.filter({ $0.entity.components[StrokeComponent.self]?.uuid == child.components[StrokeComponent.self]?.uuid }).forEach { stroke in
+                                    appModel.rpcModel.painting.paintingCanvas.tmpStrokes.filter({ $0.root.components[StrokeComponent.self]?.uuid == child.components[StrokeComponent.self]?.uuid }).forEach { stroke in
                                         stroke.updateMaxRadiusAndRemesh(scaleFactor: value.entity.transform.scale.sum() / 3)
                                     }
                                 }
@@ -211,6 +215,10 @@ struct ImmersiveView: View {
                     }
                 })
                 .onEnded({ _ in
+                    if appModel.rpcModel.painting.paintingCanvas.isControlMode {
+                        return
+                    }
+                    
                     if appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty,
                        !appModel.model.isEraserMode,
                        appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial {
@@ -229,6 +237,45 @@ struct ImmersiveView: View {
                     
                     sourceTransform = nil
                 })
+        )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .targetedToAnyEntity()
+                .onChanged { gesture in
+                    if let lastIndexPose = lastIndexPose,
+                       let bezierStrokeControlComponent: BezierStrokeControlComponent = gesture.entity.components[BezierStrokeControlComponent.self] {
+                        _ = appModel.rpcModel.sendRequest(
+                            RequestSchema(
+                                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                                method: .moveControlPoint,
+                                param: .moveControlPoint(
+                                    .init(
+                                        strokeId: bezierStrokeControlComponent.bezierStrokeId,
+                                        controlPointId: bezierStrokeControlComponent.bezierPointId,
+                                        controlType: bezierStrokeControlComponent.controlType,
+                                        newPosition: lastIndexPose
+                                    )
+                                )
+                            )
+                        )
+                    }
+                }
+                .onEnded{ gesture in
+                    if let bezierStrokeControlComponent: BezierStrokeControlComponent = gesture.entity.components[BezierStrokeControlComponent.self] {
+                        _ = appModel.rpcModel.sendRequest(
+                            RequestSchema(
+                                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                                method: .finishControlPoint,
+                                param: .finishControlPoint(
+                                    .init(
+                                        strokeId: bezierStrokeControlComponent.bezierStrokeId,
+                                        controlPointId: bezierStrokeControlComponent.bezierPointId
+                                    )
+                                )
+                            )
+                        )
+                    }
+                }
         )
         .onChange(of: appModel.rpcModel.coordinateTransforms.affineMatrixs) {
             appModel.model.resetInitBall()
@@ -411,7 +458,7 @@ extension ImmersiveView {
             appModel.model.iconEntity.orientation = simd_quatf(angle: 0, axis: SIMD3(1, 0, 0))
             appModel.model.iconEntity.transform.translation.y -= 0.01
             if appModel.model.recordTime(isBegan: false) {
-                let cleaned: [Stroke] = appModel.rpcModel.painting.paintingCanvas.strokes.removingShortStrokes(minPoints: 3)
+                let cleaned: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.strokes.removingShortStrokes(minPoints: 3)
                 if cleaned.isEmpty { return }
                 appModel.externalStrokeFileWapper.writeStroke(
                     strokes: cleaned,
@@ -499,15 +546,15 @@ extension ImmersiveView {
         } else {
             print("FileManager is already active.")
             for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                let transformedStrokes: [Stroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: Stroke) in
+                let transformedStrokes: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: BezierStroke) in
                     // points 全てにアフィン変換を適用
                     let tmpRootTransfromPoints: [SIMD4<Float>] = stroke.points.map { (point: SIMD3<Float>) in
-                        return stroke.entity.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
+                        return stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
                     }
                     let transformedPoints: [SIMD3<Float>] = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
                         matmul4x4_4x1(affineMatrix, point)
                     }
-                    return Stroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
+                    return BezierStroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
                 })
                 _ = appModel.rpcModel.sendRequest(
                     .init(
