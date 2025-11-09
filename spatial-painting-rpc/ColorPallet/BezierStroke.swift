@@ -87,7 +87,6 @@ class BezierStroke: Codable {
     /// or create a new one with the given mesh data.
     func updateMesh() {
         if !bezierPoints.beziers.isEmpty {
-            print("ポイントからベジェ化")
             points = beziers2Points(beziers: bezierPoints.beziers, resolution: 16)
         }
 
@@ -95,8 +94,11 @@ class BezierStroke: Codable {
         guard let center = points.first,
               let last = points.last else { return }
         
+        
         /// 最後の点を追加
-        points.append(last)
+        if !bezierPoints.beziers.isEmpty {
+            points.append(last)
+        }
         
         /// The position, normals, and triangle indices that the points generate.
         let (positions, normals, triangles) = generateMeshData()
@@ -118,14 +120,12 @@ class BezierStroke: Codable {
         
         // Replace the mesh with `contents` if there is a mesh component on the stroke.
         if let mesh = stroke.model?.mesh {
-            print("Replace mesh")
             do {
                 try mesh.replace(with: contents)
             } catch {
                 print("Error replacing mesh: \(error.localizedDescription)")
             }
         } else {
-            print("Generate new mesh")
             /// The new mesh that generates with `content`.
             guard let mesh = try? MeshResource.generate(from: contents) else {
                 print("Error generating mesh")
