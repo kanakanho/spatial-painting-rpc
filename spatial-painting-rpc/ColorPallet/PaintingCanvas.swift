@@ -176,7 +176,6 @@ class PaintingCanvas {
         }
         
         if let stroke = individualStroke.currentStroke {
-            //print("finish stroke")
             // Trigger the update mesh operation.
             if stroke.points.count < 4 {
                 strokes.removeAll { $0.uuid == stroke.uuid }
@@ -185,7 +184,6 @@ class PaintingCanvas {
                 individualStrokeDic[uuid] = individualStroke
                 return
             }
-//            stroke.updateMesh()
             stroke.finishRemesh()
             for i in 0..<stroke.bezierPoints.count {
                 individualStroke.currentStroke?.root.addChild(stroke.bezierPoints[i].root)
@@ -199,7 +197,7 @@ class PaintingCanvas {
                     var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
                     invisibleMaterial.opacityThreshold = 1.0
                     entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
-                    entity.components.set(StrokeComponent(stroke.uuid))
+                    entity.components.set(StrokeRootComponent(stroke.uuid))
                     entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
                     entity.position = point
                     root.addChild(entity)
@@ -258,7 +256,7 @@ class PaintingCanvas {
                 stroke.updateMesh()
                 
                 // 既存のEraserEntityを削除
-                root.children.removeAll(where: { $0.name == "clear" && $0.components[StrokeComponent.self]?.uuid == stroke.uuid })
+                root.children.removeAll(where: { $0.name == "clear" && $0.components[StrokeRootComponent.self]?.uuid == stroke.uuid })
                 
                 var count = 0
                 for point in stroke.points {
@@ -268,7 +266,7 @@ class PaintingCanvas {
                         var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
                         invisibleMaterial.opacityThreshold = 1.0
                         entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
-                        entity.components.set(StrokeComponent(stroke.uuid))
+                        entity.components.set(StrokeRootComponent(stroke.uuid))
                         entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
                         entity.position = point
                         root.addChild(entity)
@@ -290,7 +288,10 @@ class PaintingCanvas {
         newStroke.maxRadius = stroke.maxRadius
         newStroke.setActiveColor(color: stroke.activeColor)
         newStroke.points = stroke.points
-        newStroke.updateMesh()
+        newStroke.finishRemesh()
+        for i in 0..<newStroke.bezierPoints.count {
+            newStroke.root.addChild(newStroke.bezierPoints[i].root)
+        }
         
         var count = 0
         for point in stroke.points {
@@ -300,12 +301,16 @@ class PaintingCanvas {
                 var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
                 invisibleMaterial.opacityThreshold = 1.0
                 entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
-                entity.components.set(StrokeComponent(stroke.uuid))
+                entity.components.set(StrokeRootComponent(stroke.uuid))
                 entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
                 entity.position = point
                 root.addChild(entity)
             }
             count += 1
+        }
+        
+        newStroke.bezierPoints.forEach {
+            $0.root.isEnabled = false
         }
         
         strokes.append(newStroke)
@@ -381,7 +386,15 @@ extension PaintingCanvas {
             newStroke.maxRadius = stroke.maxRadius
             newStroke.setActiveColor(color: stroke.activeColor)
             newStroke.points = stroke.points
-            newStroke.updateMesh()
+            newStroke.finishRemesh()
+            for i in 0..<newStroke.bezierPoints.count {
+                newStroke.root.addChild(newStroke.bezierPoints[i].root)
+            }
+            
+            newStroke.bezierPoints.forEach {
+                $0.root.isEnabled = false
+            }
+            
             strokes.append(newStroke)
             root.addChild(newStroke.root)
             
@@ -393,7 +406,7 @@ extension PaintingCanvas {
                     var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
                     invisibleMaterial.opacityThreshold = 1.0
                     entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
-                    entity.components.set(StrokeComponent(stroke.uuid))
+                    entity.components.set(StrokeRootComponent(stroke.uuid))
                     entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
                     entity.position = point
                     root.addChild(entity)

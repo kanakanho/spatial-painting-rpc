@@ -356,7 +356,7 @@ extension ImmersiveView {
         else if name == "eraser" {
             activateEraser(finger: finger)
         }
-        else if event.entityB.hasStrokeComponent, appModel.model.isEraserMode, appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty {
+        else if event.entityB.hasStrokeRootComponent, appModel.model.isEraserMode, appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty {
             deleteStroke(event.entityB)
         }
         else if name == "button" {
@@ -528,7 +528,7 @@ extension ImmersiveView {
     }
     
     private func deleteStroke(_ entity: Entity) {
-        guard let comp: StrokeComponent = entity.components[StrokeComponent.self] else { return }
+        guard let comp: StrokeRootComponent = entity.components[StrokeRootComponent.self] else { return }
         print("Removing stroke with UUID: \(comp.uuid)")
         _ = appModel.rpcModel.sendRequest(
             RequestSchema(

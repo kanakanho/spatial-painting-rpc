@@ -169,6 +169,7 @@ class BezierStroke: Codable {
     func finishRemesh() {
         bezierPoints = points2Beziers(strokeId: uuid, points: points)
         updateMesh()
+        print("BezierStroke: finishRemesh")
     }
     
     // MARK: Helper functions
