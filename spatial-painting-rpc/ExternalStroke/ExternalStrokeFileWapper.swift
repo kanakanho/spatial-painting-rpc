@@ -36,7 +36,7 @@ class ExternalStrokeFileWapper {
     }
     
     /// 外部に保存する
-    func writeStroke(strokes : [Stroke], displayScale: CGFloat, planeNormalVector: SIMD3<Float>, planePoint: SIMD3<Float>) {
+    func writeStroke(strokes : [BezierStroke], displayScale: CGFloat, planeNormalVector: SIMD3<Float>, planePoint: SIMD3<Float>) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let nowDate = Date()
@@ -77,7 +77,7 @@ class ExternalStrokeFileWapper {
     }
     
     /// ストロークから画像を作る
-    private func makePNGData(strokes: [Stroke], planeNormal: SIMD3<Float>, planePoint: SIMD3<Float>, displayScale: CGFloat) -> Data? {
+    private func makePNGData(strokes: [BezierStroke], planeNormal: SIMD3<Float>, planePoint: SIMD3<Float>, displayScale: CGFloat) -> Data? {
         let canvasSize: CGSize = CGSize(width: 1024, height: 1024)
         /*
          let n = normalize(planeNormal)
@@ -109,7 +109,7 @@ class ExternalStrokeFileWapper {
         var maxX: Float = -Float.greatestFiniteMagnitude
         var minY: Float = Float.greatestFiniteMagnitude
         var maxY: Float = -Float.greatestFiniteMagnitude
-        for stroke: Stroke in strokes {
+        for stroke: BezierStroke in strokes {
             var proj: [SIMD2<Float>] = []
             for p: SIMD3<Float> in stroke.points {
                 let pProj: SIMD3<Float> = p - dot(p - planePoint, n) * n
@@ -145,7 +145,7 @@ class ExternalStrokeFileWapper {
         ctx.setLineWidth(4)
         
         // 描画
-        for (idx, stroke): (Int, Stroke) in strokes.enumerated() {
+        for (idx, stroke): (Int, BezierStroke) in strokes.enumerated() {
             ctx.setStrokeColor(stroke.activeColor.cgColor)
             let proj: [SIMD2<Float>] = all2D[idx]
             guard proj.count > 1 else { continue }
@@ -245,12 +245,12 @@ class ExternalStrokeFileWapper {
     }
     
     /// jsonを取得する
-    func readStrokes(in dateStr: String) -> [Stroke] {
+    func readStrokes(in dateStr: String) -> [BezierStroke] {
         do {
             let jsonFileURL = fileDir.appendingPathComponent("\(dateStr)/strokes.json")
             let data = try Data(contentsOf: jsonFileURL)
             let decoder = JSONDecoder()
-            let strokes = try decoder.decode([Stroke].self, from: data)
+            let strokes = try decoder.decode([BezierStroke].self, from: data)
             return strokes
         }
         catch {

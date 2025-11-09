@@ -211,9 +211,9 @@ class RPCModel: ObservableObject {
     /// - Parameters: request: `RequestSchema`
     /// - Returns: `RPCResult`
     func sendRequest(_ request: RequestSchema) -> RPCResult {
-        print("sendRequest")
-        print("sendMethod: \(request.method)")
-        print("sendParam: \(request.param)")
+//        print("sendRequest")
+//        print("sendMethod: \(request.method)")
+//        print("sendParam: \(request.param)")
         
         var rpcResult = RPCResult()
         switch (request.method, request.param) {
@@ -235,6 +235,8 @@ class RPCModel: ObservableObject {
             painting.removeStroke(param: p)
         case let (.paintingEntity(.changeFingerLineWidth),.paintingEntity(.changeFingerLineWidth(p))):
             painting.changeFingerLineWidth(param: p)
+        case let (.paintingEntity(.moveControlPoint), .paintingEntity(.moveControlPoint(p))):
+            painting.moveControlPoint(param: p)
         default:
             return RPCResult("Invalid request")
         }
@@ -255,9 +257,9 @@ class RPCModel: ObservableObject {
     ///         - peerId: `Int`
     /// - Returns: `RPCResult`
     func sendRequest(_ request: RequestSchema, mcPeerId: Int) -> RPCResult {
-        print("sendRequest")
-        print("sendMethod: \(request.method)")
-        print("sendParam: \(request.param)")
+//        print("sendRequest")
+//        print("sendMethod: \(request.method)")
+//        print("sendParam: \(request.param)")
         
         var rpcResult = RPCResult()
         switch (request.method, request.param) {
@@ -276,6 +278,8 @@ class RPCModel: ObservableObject {
         case let
             (.paintingEntity(.setStrokeColor),.paintingEntity(.setStrokeColor(p))):
             painting.setStrokeColor(param: p)
+        case let (.paintingEntity(.finishControlPoint), .paintingEntity(.finishControlPoint(p))):
+            painting.finishControlPoint(param: p)
         default:
             return RPCResult("Invalid request")
         }
@@ -291,9 +295,9 @@ class RPCModel: ObservableObject {
     /// - Parameters: request: `RequestSchema`
     /// - Returns: `RPCResult`
     func receiveRequest(_ request: RequestSchema) -> RPCResult {
-        print("receiveRequest")
-        print("ReceiveMethod: \(request.method)")
-        print("ReceiveParam \(request.param)")
+//        print("receiveRequest")
+//        print("ReceiveMethod: \(request.method)")
+//        print("ReceiveParam \(request.param)")
         
         var rpcResult = RPCResult()
         switch (request.method, request.param) {
@@ -319,6 +323,10 @@ class RPCModel: ObservableObject {
             painting.removeStroke(param: p)
         case let (.paintingEntity(.changeFingerLineWidth),.paintingEntity(.changeFingerLineWidth(p))):
             painting.changeFingerLineWidth(param: p)
+        case let (.paintingEntity(.moveControlPoint), .paintingEntity(.moveControlPoint(p))):
+            painting.moveControlPoint(param: p)
+        case let (.paintingEntity(.finishControlPoint), .paintingEntity(.finishControlPoint(p))):
+            painting.finishControlPoint(param: p)
         default:
             return RPCResult("Invalid request")
         }

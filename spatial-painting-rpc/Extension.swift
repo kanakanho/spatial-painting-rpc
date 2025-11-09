@@ -162,9 +162,16 @@ extension [[Float]] {
     }
 }
 
-extension Array where Element == Stroke {
+//extension Array where Element == Stroke {
+//    /// point が count 以下のストロークを取り除いた配列を返す
+//    func removingShortStrokes(minPoints: Int = 3) -> [Stroke] {
+//        return self.filter { $0.points.count >= minPoints }
+//    }
+//}
+
+extension Array where Element == BezierStroke {
     /// point が count 以下のストロークを取り除いた配列を返す
-    func removingShortStrokes(minPoints: Int = 3) -> [Stroke] {
+    func removingShortStrokes(minPoints: Int = 3) -> [BezierStroke] {
         return self.filter { $0.points.count >= minPoints }
     }
 }
