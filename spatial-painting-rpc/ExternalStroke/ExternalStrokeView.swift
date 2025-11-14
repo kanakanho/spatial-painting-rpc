@@ -127,7 +127,7 @@ struct ExternalStrokeView: View {
                     isLoading = false
                 }
                 .padding(.bottom, 20)
-                .disabled(!appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty)
+//                .disabled(!appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty)
                 
             }
             Toggle("Delete Mode", isOn: $isDeleteMode)

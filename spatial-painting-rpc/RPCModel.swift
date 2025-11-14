@@ -235,8 +235,8 @@ class RPCModel: ObservableObject {
             painting.removeStroke(param: p)
         case let (.paintingEntity(.changeFingerLineWidth),.paintingEntity(.changeFingerLineWidth(p))):
             painting.changeFingerLineWidth(param: p)
-        case let (.paintingEntity(.moveControlPoint), .paintingEntity(.moveControlPoint(p))):
-            painting.moveControlPoint(param: p)
+        case let (.paintingEntity(.finishControlPoint), .paintingEntity(.finishControlPoint(p))):
+            painting.finishControlPoint(param: p)
         default:
             return RPCResult("Invalid request")
         }
@@ -278,8 +278,8 @@ class RPCModel: ObservableObject {
         case let
             (.paintingEntity(.setStrokeColor),.paintingEntity(.setStrokeColor(p))):
             painting.setStrokeColor(param: p)
-        case let (.paintingEntity(.finishControlPoint), .paintingEntity(.finishControlPoint(p))):
-            painting.finishControlPoint(param: p)
+        case let (.paintingEntity(.moveControlPoint), .paintingEntity(.moveControlPoint(p))):
+            painting.moveControlPoint(param: p)
         default:
             return RPCResult("Invalid request")
         }

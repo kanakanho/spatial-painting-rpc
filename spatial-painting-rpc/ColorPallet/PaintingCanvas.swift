@@ -16,6 +16,7 @@ struct IndividualStroke {
     var maxRadius: Float = 1E-2
 }
 
+@Observable
 /// A class that stores each stroke and generates a mesh, in real time, from a person's gesture movement.
 class PaintingCanvas {
     /// The main root entity for the painting canvas.
@@ -230,6 +231,7 @@ class PaintingCanvas {
             for bezierPoint in stroke.bezierPoints {
                 bezierPoint.root.isEnabled = true
             }
+            stroke.updateMeshEnableFaceCulling()
         }
     }
     
@@ -238,6 +240,7 @@ class PaintingCanvas {
             for bezierPoint in stroke.bezierPoints {
                 bezierPoint.root.isEnabled = false
             }
+            stroke.updateMeshDisableFaceCulling()
         }
     }
     

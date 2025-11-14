@@ -25,7 +25,6 @@ struct ContentView: View {
     var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     var startTime = Date()
     @State var isStartImmersiveSpace: Bool = false
-    @State var isControlModeUI: Bool = false
     
     var body: some View {
         VStack {
@@ -56,13 +55,9 @@ struct ContentView: View {
             }
             Spacer()
             
-            Toggle(isOn: $isControlModeUI, label: {
-                Text(isControlModeUI ? "Control Mode On" : "Control Mode Off")
-            })
-            .toggleStyle(.button)
-            .onChange(of: isControlModeUI, {
+            Button(appModel.rpcModel.painting.paintingCanvas.isControlMode ? "Disable Control Mode" : "Enable Control Mode") {
                 appModel.rpcModel.painting.paintingCanvas.isControlModeToggle()
-            })
+            }
         }
         .padding()
         .onAppear() {

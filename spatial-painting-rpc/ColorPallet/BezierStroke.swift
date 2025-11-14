@@ -143,6 +143,109 @@ class BezierStroke: Codable {
         stroke.setTransformMatrix(.identity, relativeTo: nil)
         stroke.setPosition(center, relativeTo: nil)
     }
+    
+    func updateMeshEnableFaceCulling() {
+        if !bezierPoints.beziers.isEmpty {
+            points = beziers2Points(beziers: bezierPoints.beziers, resolution: 8)
+        }
+
+        /// The starting point where the stroke mesh begins.
+        guard let center = points.first,
+              let last = points.last else { return }
+        
+        
+        /// 最後の点を追加
+        if !bezierPoints.beziers.isEmpty {
+            points.append(last)
+        }
+        
+        /// The position, normals, and triangle indices that the points generate.
+        let (positions, normals, triangles) = generateMeshData()
+        
+        /// The `MeshResource.Contents` instance.
+        var contents = MeshResource.Contents()
+        
+        // Create and assign an instance to `contents`.
+        contents.instances = [MeshResource.Instance(id: "main", model: "model")]
+        
+        // Create the part for the model, and set the vertex positions, triangle indices, and normals.
+        var part = MeshResource.Part(id: "part", materialIndex: 0)
+        part.positions = MeshBuffer(positions)
+        part.triangleIndices = MeshBuffer(triangles)
+        part.normals = MeshBuffer(normals)
+        
+        // Create and assign a model that consists of the `part`.
+        contents.models = [MeshResource.Model(id: "model", parts: [part])]
+        
+        /// The new mesh that generates with `content`.
+        guard let mesh = try? MeshResource.generate(from: contents) else {
+            print("Error generating mesh")
+            return
+        }
+        
+        var material: SimpleMaterial = SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)
+        material.faceCulling = .front
+        
+        // Set the model component to the new mesh, and assign a simple material.
+        stroke.components.set(ModelComponent(
+            mesh: mesh,
+            materials: [material]
+        ))
+        
+        // Set the stroke's transform and position.
+        stroke.setTransformMatrix(.identity, relativeTo: nil)
+        stroke.setPosition(center, relativeTo: nil)
+    }
+    
+    func updateMeshDisableFaceCulling() {
+        if !bezierPoints.beziers.isEmpty {
+            points = beziers2Points(beziers: bezierPoints.beziers, resolution: 8)
+        }
+
+        /// The starting point where the stroke mesh begins.
+        guard let center = points.first,
+              let last = points.last else { return }
+        
+        
+        /// 最後の点を追加
+        if !bezierPoints.beziers.isEmpty {
+            points.append(last)
+        }
+        
+        /// The position, normals, and triangle indices that the points generate.
+        let (positions, normals, triangles) = generateMeshData()
+        
+        /// The `MeshResource.Contents` instance.
+        var contents = MeshResource.Contents()
+        
+        // Create and assign an instance to `contents`.
+        contents.instances = [MeshResource.Instance(id: "main", model: "model")]
+        
+        // Create the part for the model, and set the vertex positions, triangle indices, and normals.
+        var part = MeshResource.Part(id: "part", materialIndex: 0)
+        part.positions = MeshBuffer(positions)
+        part.triangleIndices = MeshBuffer(triangles)
+        part.normals = MeshBuffer(normals)
+        
+        // Create and assign a model that consists of the `part`.
+        contents.models = [MeshResource.Model(id: "model", parts: [part])]
+        
+        /// The new mesh that generates with `content`.
+        guard let mesh = try? MeshResource.generate(from: contents) else {
+            print("Error generating mesh")
+            return
+        }
+        
+        // Set the model component to the new mesh, and assign a simple material.
+        stroke.components.set(ModelComponent(
+            mesh: mesh,
+            materials: [SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)]
+        ))
+        
+        // Set the stroke's transform and position.
+        stroke.setTransformMatrix(.identity, relativeTo: nil)
+        stroke.setPosition(center, relativeTo: nil)
+    }
             
     func points2MeshContents(poitns: [SIMD3<Float>]) -> MeshResource.Contents {
         /// The position, normals, and triangle indices that the points generate.

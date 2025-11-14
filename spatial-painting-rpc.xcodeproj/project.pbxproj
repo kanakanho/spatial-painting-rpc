@@ -26,22 +26,9 @@
 		EB227F282DD1B80F00ED8411 /* spatial-painting-rpcTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "spatial-painting-rpcTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		EB227F2E2DD1B80F00ED8411 /* Exceptions for "spatial-painting-rpc" folder in "spatial-painting-rpc" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = EB227F0C2DD1B80D00ED8411 /* spatial-painting-rpc */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		EB227F0F2DD1B80D00ED8411 /* spatial-painting-rpc */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				EB227F2E2DD1B80F00ED8411 /* Exceptions for "spatial-painting-rpc" folder in "spatial-painting-rpc" target */,
-			);
 			path = "spatial-painting-rpc";
 			sourceTree = "<group>";
 		};

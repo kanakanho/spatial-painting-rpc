@@ -244,19 +244,11 @@ struct ImmersiveView: View {
                 .onChanged { gesture in
                     if let lastIndexPose = lastIndexPose,
                        let bezierStrokeControlComponent: BezierStrokeControlComponent = gesture.entity.components[BezierStrokeControlComponent.self] {
-                        _ = appModel.rpcModel.sendRequest(
-                            RequestSchema(
-                                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                                method: .moveControlPoint,
-                                param: .moveControlPoint(
-                                    .init(
-                                        strokeId: bezierStrokeControlComponent.bezierStrokeId,
-                                        controlPointId: bezierStrokeControlComponent.bezierPointId,
-                                        controlType: bezierStrokeControlComponent.controlType,
-                                        newPosition: lastIndexPose
-                                    )
-                                )
-                            )
+                        appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
+                            strokeId: bezierStrokeControlComponent.bezierStrokeId,
+                            controlPointId: bezierStrokeControlComponent.bezierPointId,
+                            controlType: bezierStrokeControlComponent.controlType,
+                            newPosition: lastIndexPose
                         )
                     }
                 }
@@ -356,7 +348,7 @@ extension ImmersiveView {
         else if name == "eraser" {
             activateEraser(finger: finger)
         }
-        else if event.entityB.hasStrokeRootComponent, appModel.model.isEraserMode, appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty {
+        else if event.entityB.hasStrokeRootComponent, appModel.model.isEraserMode, appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty, !appModel.rpcModel.painting.paintingCanvas.isControlMode {
             deleteStroke(event.entityB)
         }
         else if name == "button" {
