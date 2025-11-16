@@ -21,6 +21,8 @@ struct ImmersiveView: View {
     @State private var lastIndexPose: SIMD3<Float>? = nil
     @State private var sourceTransform: Transform? = nil
     
+    @State private var lastControlIndexPose: SIMD3<Float>? = nil
+    
     private let keyDownHeight: Float = 0.005
     
     @State private var isCurrentSendPoint: Bool = false
@@ -84,6 +86,13 @@ struct ImmersiveView: View {
                         
                         if length(thumbPos - indexPos) < pinchThreshold {
                             lastIndexPose = indexPos
+                            
+                            // もっとも近い制御点を探す
+                            if let nearestControlPoint = appModel.rpcModel.painting.paintingCanvas.gridPoints.findNearestPointInRadius(queryPoint: indexPos, radius: 0.02) {
+                                lastControlIndexPose = nearestControlPoint
+                            } else {
+                                lastControlIndexPose = indexPos
+                            }
                         }
                     }
                 }))
@@ -242,13 +251,13 @@ struct ImmersiveView: View {
             DragGesture(minimumDistance: 0)
                 .targetedToAnyEntity()
                 .onChanged { gesture in
-                    if let lastIndexPose = lastIndexPose,
+                    if let lastControlIndexPose = lastControlIndexPose,
                        let bezierStrokeControlComponent: BezierStrokeControlComponent = gesture.entity.components[BezierStrokeControlComponent.self] {
                         appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
                             strokeId: bezierStrokeControlComponent.bezierStrokeId,
                             controlPointId: bezierStrokeControlComponent.bezierPointId,
                             controlType: bezierStrokeControlComponent.controlType,
-                            newPosition: lastIndexPose
+                            newPosition: lastControlIndexPose
                         )
                     }
                 }

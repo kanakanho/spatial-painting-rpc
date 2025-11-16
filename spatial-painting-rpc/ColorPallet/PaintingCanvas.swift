@@ -22,6 +22,8 @@ class PaintingCanvas {
     /// The main root entity for the painting canvas.
     let root = Entity()
     
+    var gridPoints: GridPoints = GridPoints()
+    
     var strokes: [BezierStroke] = []
     let tmpRoot = Entity()
     var tmpStrokes: [BezierStroke] = []
@@ -186,6 +188,7 @@ class PaintingCanvas {
                 return
             }
             stroke.finishRemesh()
+            gridPoints.addPoints(from: stroke.bezierPoints)
             for i in 0..<stroke.bezierPoints.count {
                 individualStroke.currentStroke?.root.addChild(stroke.bezierPoints[i].root)
             }
@@ -214,6 +217,23 @@ class PaintingCanvas {
             individualStroke.currentStroke = nil
             
             individualStrokeDic[uuid] = individualStroke
+        }
+    }
+    
+    func removeStroke(strokeId: UUID) {
+        if let index = strokes.firstIndex(where: { $0.uuid == strokeId }) {
+            gridPoints.removePoints(from: strokes[index].bezierPoints)
+        }
+        
+        strokes.removeAll{ $0.root.components[StrokeRootComponent.self]?.uuid == strokeId}
+        
+        DispatchQueue.main.async {
+            let childrenToRemove = self.root.children.filter {
+                $0.components[StrokeRootComponent.self]?.uuid == strokeId
+            }
+            for child in childrenToRemove {
+                child.removeFromParent()
+            }
         }
     }
     
@@ -257,6 +277,7 @@ class PaintingCanvas {
         for stroke in strokes {
             if stroke.uuid == strokeId {
                 stroke.updateMesh()
+                gridPoints.addPoints(from: stroke.bezierPoints)
                 
                 // 既存のEraserEntityを削除
                 root.children.removeAll(where: { $0.name == "clear" && $0.components[StrokeRootComponent.self]?.uuid == stroke.uuid })

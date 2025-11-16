@@ -29,16 +29,7 @@ class Painting:ObservableObject {
     
     /// 指定したUUIDを `StrokeComponent` に持つストロークを削除する
     func removeStroke(param: RemoveStrokeParam){
-        paintingCanvas.strokes.removeAll{ $0.root.components[StrokeRootComponent.self]?.uuid == param.uuid}
-        
-        DispatchQueue.main.async {
-            let childrenToRemove = self.paintingCanvas.root.children.filter {
-                $0.components[StrokeRootComponent.self]?.uuid == param.uuid
-            }
-            for child in childrenToRemove {
-                child.removeFromParent()
-            }
-        }
+        paintingCanvas.removeStroke(strokeId: param.uuid)
     }
     
     /// ストロークを描く

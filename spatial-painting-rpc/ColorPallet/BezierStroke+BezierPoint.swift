@@ -64,6 +64,10 @@ extension BezierStroke {
         public var startControl: SIMD3<Float>?
         public var endControl: SIMD3<Float>?
         
+        public let endID: UUID = UUID()
+        public let startControlID: UUID = UUID()
+        public let endControlID: UUID = UUID()
+        
         init(strokeId: UUID) {
             endEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
             startHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
