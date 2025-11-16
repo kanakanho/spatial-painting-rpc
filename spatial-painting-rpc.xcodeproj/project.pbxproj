@@ -26,6 +26,16 @@
 		EB227F282DD1B80F00ED8411 /* spatial-painting-rpcTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "spatial-painting-rpcTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EBA172962EC8703900CF2195 /* Exceptions for "spatial-painting-rpc" folder in "spatial-painting-rpc" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = EB227F0C2DD1B80D00ED8411 /* spatial-painting-rpc */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		EB227F0F2DD1B80D00ED8411 /* spatial-painting-rpc */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -154,14 +164,17 @@
 				};
 			};
 			buildConfigurationList = EB227F082DD1B80D00ED8411 /* Build configuration list for PBXProject "spatial-painting-rpc" */;
-			developmentRegion = en;
+			developmentRegion = ja;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
+				ja,
 			);
 			mainGroup = EB227F042DD1B80D00ED8411;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EB227F0E2DD1B80D00ED8411 /* Products */;
 			projectDirPath = "";
@@ -229,6 +242,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "";
+				INFOPLIST_KEY_NSWorldSensingUsageDescription = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -241,7 +256,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 7;
-				XROS_DEPLOYMENT_TARGET = 2.5;
+				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Debug;
 		};
@@ -258,6 +273,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "";
+				INFOPLIST_KEY_NSWorldSensingUsageDescription = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -269,7 +286,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 7;
-				XROS_DEPLOYMENT_TARGET = 2.5;
+				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;
 		};
