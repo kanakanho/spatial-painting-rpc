@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		EB227F132DD1B80D00ED8411 /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = EB227F122DD1B80D00ED8411 /* RealityKitContent */; };
+		EB227F132DD1B80D00ED8411 /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = EB227F122DD1B80D00ED8411 /* RealityKitContent */; settings = {ATTRIBUTES = (Required, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -27,7 +27,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		EBA172962EC8703900CF2195 /* Exceptions for "spatial-painting-rpc" folder in "spatial-painting-rpc" target */ = {
+		EBA174772ECAEF9600CF2195 /* Exceptions for "spatial-painting-rpc" folder in "spatial-painting-rpc" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -39,6 +39,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		EB227F0F2DD1B80D00ED8411 /* spatial-painting-rpc */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EBA174772ECAEF9600CF2195 /* Exceptions for "spatial-painting-rpc" folder in "spatial-painting-rpc" target */,
+			);
 			path = "spatial-painting-rpc";
 			sourceTree = "<group>";
 		};
@@ -152,7 +155,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
-				LastUpgradeCheck = 2600;
+				LastUpgradeCheck = 2610;
 				TargetAttributes = {
 					EB227F0C2DD1B80D00ED8411 = {
 						CreatedOnToolsVersion = 16.0;
@@ -243,6 +246,7 @@
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "";
 				INFOPLIST_KEY_NSWorldSensingUsageDescription = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -274,6 +278,7 @@
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
 				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "";
 				INFOPLIST_KEY_NSWorldSensingUsageDescription = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -295,6 +300,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -360,6 +366,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";

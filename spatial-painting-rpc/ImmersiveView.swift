@@ -228,9 +228,27 @@ struct ImmersiveView: View {
                         return
                     }
                     
-                    if appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty,
-                       !appModel.model.isEraserMode,
+                    if !appModel.model.isEraserMode,
                        appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial {
+                        // 自分の端末の中でベジェ曲線化
+                        guard let bezierStroke: BezierStroke = appModel.rpcModel.painting.paintingCanvas.individualPoints2Bezier(userId: appModel.mcPeerIDUUIDWrapper.myId) else {
+                            return
+                        }
+                        
+                        // ベジェ曲線の情報を共有
+                        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                            _ = appModel.rpcModel.sendRequest(
+                                RequestSchema(
+                                    peerId:  appModel.mcPeerIDUUIDWrapper.mine.hash,
+                                    method: .addBezierStrokePoints,
+                                    param: .addBezierStrokePoints(
+                                        .init(userId: appModel.mcPeerIDUUIDWrapper.myId, bezierPoints: bezierStroke.bezierPoints.getPoints(affine: affineMatrix))
+                                    )
+                                ),
+                                mcPeerId: id
+                            )
+                        }
+                        
                         _ = appModel.rpcModel.sendRequest(
                             RequestSchema(
                                 peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
@@ -251,14 +269,33 @@ struct ImmersiveView: View {
             DragGesture(minimumDistance: 0)
                 .targetedToAnyEntity()
                 .onChanged { gesture in
-                    if let lastControlIndexPose = lastControlIndexPose,
-                       let bezierStrokeControlComponent: BezierStrokeControlComponent = gesture.entity.components[BezierStrokeControlComponent.self] {
+                    if let lastControlIndexPose: SIMD3<Float> = lastControlIndexPose,
+                       let bezierStrokeControlComponent: BezierStrokeControlComponent = gesture.entity.components[BezierStrokeControlComponent.self]
+                    {
                         appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
                             strokeId: bezierStrokeControlComponent.bezierStrokeId,
                             controlPointId: bezierStrokeControlComponent.bezierPointId,
                             controlType: bezierStrokeControlComponent.controlType,
                             newPosition: lastControlIndexPose
                         )
+                        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                            let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, lastControlIndexPose)
+                            _ = appModel.rpcModel.sendRequest(
+                                RequestSchema(
+                                    peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                                    method: .moveControlPoint,
+                                    param: .moveControlPoint(
+                                        .init(
+                                            strokeId: bezierStrokeControlComponent.bezierStrokeId,
+                                            controlPointId: bezierStrokeControlComponent.bezierPointId,
+                                            controlType: bezierStrokeControlComponent.controlType,
+                                            newPosition: clientPos
+                                        )
+                                    )
+                                ),
+                                mcPeerId: id
+                            )
+                        }
                     }
                 }
                 .onEnded{ gesture in

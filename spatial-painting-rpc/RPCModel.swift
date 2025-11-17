@@ -272,14 +272,18 @@ class RPCModel: ObservableObject {
         case (.paintingEntity(.addStrokePoint),.paintingEntity(.addStrokePoint(_))):
             // 自身に対して追加操作を行わない
             break
+        case (.paintingEntity(.addBezierStrokePoints),.paintingEntity(.addBezierStrokePoints(_))):
+            // 自身に対して追加操作を行わない
+            break
         case (.paintingEntity(.addStrokes),.paintingEntity(.addStrokes(_))):
             // 自身に対して追加操作を行わない
             break
         case let
             (.paintingEntity(.setStrokeColor),.paintingEntity(.setStrokeColor(p))):
             painting.setStrokeColor(param: p)
-        case let (.paintingEntity(.moveControlPoint), .paintingEntity(.moveControlPoint(p))):
-            painting.moveControlPoint(param: p)
+        case (.paintingEntity(.moveControlPoint), .paintingEntity(.moveControlPoint(_))):
+            // 自身に対して追加操作を行わない
+            break
         default:
             return RPCResult("Invalid request")
         }
@@ -309,6 +313,8 @@ class RPCModel: ObservableObject {
             rpcResult = coordinateTransforms.setState(param: p)
         case let (.paintingEntity(.addStrokePoint),.paintingEntity(.addStrokePoint(p))):
             painting.addStrokePoint(param: p)
+        case let (.paintingEntity(.addBezierStrokePoints),.paintingEntity(.addBezierStrokePoints(p))):
+            painting.addBezierStrokePoints(param: p)
         case let (.paintingEntity(.finishStroke),.paintingEntity(.finishStroke(p))):
             painting.finishStroke(param: p)
         case let (.paintingEntity(.addStrokes),.paintingEntity(.addStrokes(p))):

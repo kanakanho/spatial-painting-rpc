@@ -6,10 +6,6 @@
 	<array>
 		<string>_painting-rpc._tcp</string>
 	</array>
-	<key>NSHandsTrackingUsageDescription</key>
-	<string></string>
-	<key>NSWorldSensingUsageDescription</key>
-	<string></string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationPreferredDefaultSceneSessionRole</key>

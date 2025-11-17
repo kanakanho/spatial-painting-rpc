@@ -268,13 +268,6 @@ class BezierStroke: Codable {
         return contents
     }
     
-    ///
-    func finishRemesh() {
-        bezierPoints = points2Beziers(strokeId: uuid, points: points)
-        updateMesh()
-        print("BezierStroke: finishRemesh")
-    }
-    
     // MARK: Helper functions
     
     /// Generate the mesh data with the current points.
@@ -349,13 +342,13 @@ class BezierStroke: Codable {
     private func calculatePositionAndNormal(
         pointI: Int, point: Int, radius: Float, xAxis: SIMD3<Float>, yAxis: SIMD3<Float>) -> (SIMD3<Float>, SIMD3<Float>) {
             /// The angle is the product of two times pi, then divide the total points per ring.
-            let angle = 2 * .pi * Float(point) / Float(pointsPerRing)
+            let angle: Float = 2 * .pi * Float(point) / Float(pointsPerRing)
             
             /// The current normal value from the angle.
-            let normal = cos(angle) * xAxis + sin(angle) * yAxis
+            let normal: SIMD3<Float> = cos(angle) * xAxis + sin(angle) * yAxis
             
             /// The location of the current point with its distance from the center point.
-            let position = (points[pointI] - points[0]) + radius * normal
+            let position: SIMD3<Float> = (points[pointI] - points[0]) + radius * normal
             
             return (position, normal)
         }

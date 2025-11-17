@@ -172,6 +172,30 @@ class PaintingCanvas {
         individualStrokeDic[userId] = individualStroke
     }
     
+    func addBezierStrokePoints(userId: UUID, bezierPoints: [BezierStroke.BezierPoint]) {
+        guard var individualStroke: IndividualStroke = individualStrokeDic[userId],
+              let stroke = individualStroke.currentStroke else {
+            return
+        }
+        
+        stroke.bezierPoints = bezierPoints
+        individualStroke.currentStroke = stroke
+        individualStrokeDic[userId] = individualStroke
+    }
+    
+    func individualPoints2Bezier(userId: UUID) -> BezierStroke? {
+        guard var individualStroke: IndividualStroke = individualStrokeDic[userId],
+              let stroke = individualStroke.currentStroke else {
+            return nil
+        }
+        
+        stroke.bezierPoints = points2Beziers(strokeId: stroke.uuid, points: stroke.points)
+        individualStroke.currentStroke = stroke
+        individualStrokeDic[userId] = individualStroke
+        
+        return stroke
+    }
+    
     /// Clear the stroke when the drag gesture ends.
     func finishStroke(_ uuid: UUID) {
         guard var individualStroke: IndividualStroke = individualStrokeDic[uuid] else {
@@ -187,7 +211,7 @@ class PaintingCanvas {
                 individualStrokeDic[uuid] = individualStroke
                 return
             }
-            stroke.finishRemesh()
+            stroke.updateMesh()
             gridPoints.addPoints(from: stroke.bezierPoints)
             for i in 0..<stroke.bezierPoints.count {
                 individualStroke.currentStroke?.root.addChild(stroke.bezierPoints[i].root)
@@ -276,7 +300,6 @@ class PaintingCanvas {
     func finishControlPoint(strokeId: UUID, controlPointId: UUID) {
         for stroke in strokes {
             if stroke.uuid == strokeId {
-                stroke.updateMesh()
                 gridPoints.addPoints(from: stroke.bezierPoints)
                 
                 // 既存のEraserEntityを削除
@@ -312,7 +335,8 @@ class PaintingCanvas {
         newStroke.maxRadius = stroke.maxRadius
         newStroke.setActiveColor(color: stroke.activeColor)
         newStroke.points = stroke.points
-        newStroke.finishRemesh()
+        newStroke.bezierPoints = points2Beziers(strokeId: stroke.uuid, points: stroke.points)
+        newStroke.updateMesh()
         for i in 0..<newStroke.bezierPoints.count {
             newStroke.root.addChild(newStroke.bezierPoints[i].root)
         }
@@ -410,7 +434,8 @@ extension PaintingCanvas {
             newStroke.maxRadius = stroke.maxRadius
             newStroke.setActiveColor(color: stroke.activeColor)
             newStroke.points = stroke.points
-            newStroke.finishRemesh()
+            newStroke.bezierPoints = points2Beziers(strokeId: stroke.uuid, points: stroke.points)
+            newStroke.updateMesh()
             for i in 0..<newStroke.bezierPoints.count {
                 newStroke.root.addChild(newStroke.bezierPoints[i].root)
             }
