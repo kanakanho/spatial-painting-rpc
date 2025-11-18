@@ -7,7 +7,7 @@
 
 def Xform "Root"
 {
-    reorder nameChildren = ["button", "button2", "collider", "white", "black", "red", "yellow", "green", "cyan", "blue", "magenta", "clear", "brown", "orange"]
+    reorder nameChildren = ["button", "button2", "bezierHandle", "bezierEndPoint", "collider", "white", "black", "red", "yellow", "green", "cyan", "blue", "magenta", "clear", "brown", "orange"]
     def "white" (
         active = true
         prepend apiSchemas = ["MaterialBindingAPI"]
@@ -726,7 +726,7 @@ def Xform "Root"
             }
 
             def Material "mat1_1" (
-                prepend references = </Root/collider/Materials/mat1>
+                references = </Root/collider/Materials/mat1>
             )
             {
                 token cullMode = "back" (
@@ -937,6 +937,113 @@ def Xform "Root"
                 {
                 }
             }
+        }
+    }
+
+    def "bezierHandle" (
+        active = true
+        references = @bezierHandle.usdz@
+    )
+    {
+        float3 xformOp:scale = (0.004, 0.004, 0.004)
+        float3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "Materials"
+        {
+            over "defaultMaterial"
+            {
+                token outputs:mtlx:surface
+                token outputs:realitykit:vertex
+            }
+
+            over "mat1"
+            {
+                token outputs:mtlx:surface.connect = </Root/bezierHandle/Materials/mat1/PreviewSurface.outputs:out>
+                token outputs:realitykit:vertex
+                token outputs:surface.connect = </Root/bezierHandle/Materials/mat1/mat1PreviewSurface.outputs:surface>
+                float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (0, 110.5)
+
+                over "mat1PreviewSurface" (
+                    active = true
+                )
+                {
+                    color3f inputs:diffuseColor = (0.016804177, 0.198351, 1) (
+                        colorSpace = "srgb_texture"
+                    )
+                    float inputs:opacityThreshold
+                }
+
+                def Shader "PreviewSurface" (
+                    active = false
+                )
+                {
+                    uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
+                    token outputs:out
+                    float2 ui:nodegraph:node:pos = (-255, 105)
+                }
+            }
+        }
+
+        def RealityKitComponent "InputTarget"
+        {
+            uniform token info:id = "RealityKit.InputTarget"
+        }
+
+        def RealityKitComponent "Collider"
+        {
+            uint group = 1
+            uniform token info:id = "RealityKit.Collider"
+            uint mask = 4294967295
+            token type = "Default"
+
+            def RealityKitStruct "Shape"
+            {
+                float3 extent = (10, 10, 10)
+                float radius = 5
+                token shapeType = "Sphere"
+
+                def RealityKitStruct "pose"
+                {
+                }
+            }
+        }
+    }
+
+    def "bezierEndPoint" (
+        active = true
+        prepend references = @bezierEndPoint.usdz@
+    )
+    {
+        float3 xformOp:scale = (1, 1, 1)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def RealityKitComponent "InputTarget"
+        {
+            uniform token info:id = "RealityKit.InputTarget"
+        }
+
+        def RealityKitComponent "Collider"
+        {
+            uint group = 1
+            uniform token info:id = "RealityKit.Collider"
+            uint mask = 4294967295
+            token type = "Default"
+
+            def RealityKitStruct "Shape"
+            {
+                float3 extent = (0.1, 0.1, 0.1)
+                token shapeType = "Box"
+
+                def RealityKitStruct "pose"
+                {
+                }
+            }
+        }
+
+        over "Cube"
+        {
+            double size = 0.1
         }
     }
 }

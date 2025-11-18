@@ -34,10 +34,18 @@ struct ImmersiveView: View {
                 let scene: Entity = try await Entity(named: "colorpallet", in: realityKitContentBundle)
                 
                 /// RealityKit のシーンを RealityView に追加
-                if let eraserEntity: Entity = scene.findEntity(named: "collider") {
-                    appModel.rpcModel.painting.paintingCanvas.setEraserEntity(eraserEntity)
+                if let eraserEntity: Entity = scene.findEntity(named: "collider"),
+                   let bezierEndPointEntity: Entity = scene.findEntity(named: "bezierEndPoint"),
+                   let bezierHandleEntity: Entity = scene.findEntity(named: "bezierHandle") {
+                    appModel.rpcModel.painting.paintingCanvas.setEntities(eraserEntity: eraserEntity, bezierEndPointEntity: bezierEndPointEntity.clone(recursive: true), bezierHandleEntity: bezierHandleEntity.clone(recursive: true))
                 } else {
-                    print("eraserEntity not found")
+                    if scene.findEntity(named: "collider") == nil {
+                        print("collider not found")
+                    } else if scene.findEntity(named: "bezierEndPoint") == nil {
+                        print("bezierEndPoint not found")
+                    } else if scene.findEntity(named: "bezierHandle") == nil {
+                        print("bezierHandle not found")
+                    }
                 }
                 
                 if let buttonPlateEntity = scene.findEntity(named: "board") {

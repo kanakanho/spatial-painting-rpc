@@ -8368,5 +8368,98 @@ def Xform "Root"
             }
         }
     }
+
+    def "bezierEndPoint" (
+        active = true
+        prepend references = @bezierEndPoint.usdz@
+    )
+    {
+        float3 xformOp:scale = (0.02, 0.02, 0.02)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def RealityKitComponent "InputTarget"
+        {
+            uniform token info:id = "RealityKit.InputTarget"
+        }
+
+        def RealityKitComponent "Collider"
+        {
+            uint group = 1
+            uniform token info:id = "RealityKit.Collider"
+            uint mask = 4294967295
+            token type = "Default"
+
+            def RealityKitStruct "Shape"
+            {
+                float3 extent = (1.1, 1.1, 2)
+                token shapeType = "Box"
+
+                def RealityKitStruct "pose"
+                {
+                }
+            }
+        }
+    }
+
+    def "bezierHandle" (
+        active = true
+        prepend references = @bezierHandle.usdz@
+    )
+    {
+        float3 xformOp:scale = (0.002, 0.002, 0.002)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "Materials"
+        {
+            over "mat1"
+            {
+                token outputs:mtlx:surface
+                token outputs:realitykit:vertex
+
+                over "mat1PreviewSurface"
+                {
+                    color3f inputs:diffuseColor = (0.016804177, 0.198351, 1) (
+                        colorSpace = "srgb_texture"
+                    )
+                }
+            }
+
+            over "defaultMaterial"
+            {
+                token outputs:mtlx:surface
+                token outputs:realitykit:vertex
+
+                over "Shader"
+                {
+                    color3f inputs:diffuseColor = (0.016804177, 0.198351, 1) (
+                        colorSpace = "srgb_texture"
+                    )
+                }
+            }
+        }
+
+        def RealityKitComponent "InputTarget"
+        {
+            uniform token info:id = "RealityKit.InputTarget"
+        }
+
+        def RealityKitComponent "Collider"
+        {
+            uint group = 1
+            uniform token info:id = "RealityKit.Collider"
+            uint mask = 4294967295
+            token type = "Default"
+
+            def RealityKitStruct "Shape"
+            {
+                float3 extent = (10, 10, 10)
+                token shapeType = "Box"
+
+                def RealityKitStruct "pose"
+                {
+                }
+            }
+        }
+    }
 }
 

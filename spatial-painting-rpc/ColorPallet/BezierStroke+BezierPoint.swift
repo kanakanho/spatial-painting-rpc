@@ -56,11 +56,11 @@ extension BezierStroke {
         public let strokeId: UUID
         
         public var root: Entity = Entity()
-        var endEntity: ModelEntity = ModelEntity(mesh: endEntityMesh, materials: [endEntityMaterial], collisionShape: .generateSphere(radius: endShapeSize), mass: 0.0)
         var controlEntity: ModelEntity = ModelEntity(mesh: controlEntityMesh, materials: [controlEntityMaterial], collisionShape: .generateSphere(radius: controlEntitySize), mass: 0.0)
-        var startHandleEntity: ModelEntity = ModelEntity(mesh: handleEntityMesh, materials: [handleEntityMaterial], collisionShape: .generateSphere(radius: handleEntityBoxSize), mass: 0.0)
-        var endHandleEntity: ModelEntity = ModelEntity(mesh: handleEntityMesh, materials: [handleEntityMaterial], collisionShape: .generateSphere(radius: handleEntityBoxSize), mass: 0.0)
-        
+        var endEntity: Entity
+        var startHandleEntity: Entity
+        var endHandleEntity: Entity
+
         public var end: SIMD3<Float>?
         public var startControl: SIMD3<Float>?
         public var endControl: SIMD3<Float>?
@@ -69,8 +69,36 @@ extension BezierStroke {
         public let startControlID: UUID = UUID()
         public let endControlID: UUID = UUID()
         
-        init(strokeId: UUID) {
+        func setEntities(bezierEndPoint: Entity, bezierHandle: Entity) {
+            self.endEntity.removeFromParent()
+            self.startHandleEntity.removeFromParent()
+            self.endHandleEntity.removeFromParent()
+
+            self.endEntity = bezierEndPoint
+            self.endHandleEntity = bezierHandle.clone(recursive: true)
+            self.startHandleEntity = bezierHandle.clone(recursive: true)
+            
+            self.endEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
+            self.startHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
+            self.endHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
+            
+            self.endEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .end))
+            self.startHandleEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .startControl))
+            self.endHandleEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .endControl))
+            
+            self.root.addChild(self.endEntity)
+            self.root.addChild(self.startHandleEntity)
+            self.root.addChild(self.endHandleEntity)
+        }
+        
+        init(strokeId: UUID, pointId: UUID, bezierEndPoint: Entity, bezierHandle: Entity) {
             self.strokeId = strokeId
+            self.uuid = pointId
+            
+            endEntity = bezierEndPoint
+            startHandleEntity = bezierHandle.clone(recursive: true)
+            endHandleEntity = bezierHandle.clone(recursive: true)
+            
             endEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
             startHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
             endHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
@@ -85,9 +113,13 @@ extension BezierStroke {
             root.addChild(endHandleEntity)
         }
 
-        init(strokeId: UUID, pointId: UUID) {
+        init(strokeId: UUID, pointId: UUID = UUID()) {
             self.strokeId = strokeId
             self.uuid = pointId
+            
+            endEntity = ModelEntity()
+            endHandleEntity = ModelEntity()
+            startHandleEntity = ModelEntity()
             
             endEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
             startHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
@@ -232,6 +264,10 @@ extension BezierStroke {
             self.startControl = try container.decodeIfPresent(SIMD3<Float>.self, forKey: .startControl)
             self.endControl = try container.decodeIfPresent(SIMD3<Float>.self, forKey: .endControl)
             
+            endEntity = ModelEntity()
+            startHandleEntity = ModelEntity()
+            endHandleEntity = ModelEntity()
+            
             endEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
             startHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
             endHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
@@ -328,7 +364,7 @@ extension [BezierStroke.BezierPoint] {
 extension [[SIMD3<Float>]] {
     /// ベジェのデータを `BezierStroke.BezierPoint` に変換する
     /// [firstPoint, ctrl1, ctrl2, lastPoint]
-    func toBezierStrokeBezierPoint(strokeId: UUID) -> [BezierStroke.BezierPoint] {
+    func toBezierStrokeBezierPoint(strokeId: UUID, bezierEndPoint: Entity, bezierHandle: Entity) -> [BezierStroke.BezierPoint] {
         // 4点ない場合は消す
         if self.count < 3 {
             return []
@@ -339,14 +375,14 @@ extension [[SIMD3<Float>]] {
         guard let end = self.first?[0],
               let endControl = self.first?[1] else { return [] }
         
-        let startPoint: BezierStroke.BezierPoint = BezierStroke.BezierPoint(strokeId: strokeId)
+        let startPoint: BezierStroke.BezierPoint = BezierStroke.BezierPoint(strokeId: strokeId, pointId: UUID(), bezierEndPoint: bezierEndPoint.clone(recursive: true), bezierHandle: bezierHandle.clone(recursive: true))
         startPoint.add(point: end, pn: .end)
         startPoint.add(point: endControl, pn: .endControl)
         
         bezierPoints.append(startPoint)
         
         for points in self {
-            let tmpBezierPoint = BezierStroke.BezierPoint(strokeId: strokeId)
+            let tmpBezierPoint = BezierStroke.BezierPoint(strokeId: strokeId, pointId: UUID(), bezierEndPoint: bezierEndPoint.clone(recursive: true), bezierHandle: bezierHandle.clone(recursive: true))
             tmpBezierPoint.add(point: points[3], pn: .end)
             tmpBezierPoint.add(point: points[2], pn: .startControl)
             

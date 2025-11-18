@@ -101,9 +101,9 @@ func beziers2Points(beziers: [[SIMD3<Double>]]) -> [SIMD3<Double>] {
 }
 
 
-func points2Beziers(strokeId: UUID, points: [SIMD3<Float>], max_error: Float = 0.0001) -> [BezierStroke.BezierPoint] {
+func points2Beziers(strokeId: UUID, points: [SIMD3<Float>], bezierEndPoint: Entity, bezierHandle: Entity, max_error: Float = 0.0001) -> [BezierStroke.BezierPoint] {
     let fittedBeziers: [[SIMD3<Float>]] = BezierFitter.fitCurve(points: points, maxError: max_error)
-    let bezierPoints: [BezierStroke.BezierPoint] = fittedBeziers.toBezierStrokeBezierPoint(strokeId: strokeId)
+    let bezierPoints: [BezierStroke.BezierPoint] = fittedBeziers.toBezierStrokeBezierPoint(strokeId: strokeId, bezierEndPoint: bezierEndPoint, bezierHandle: bezierHandle)
     return bezierPoints
 }
 
@@ -506,13 +506,6 @@ struct BezierFitter {
         }
         
         return [firstPoint, ctrl1, ctrl2, lastPoint]
-        
-//        var one = BezierStroke.BezierPoint(strokeId: UUID())
-//        one.add(point: firstPoint, pn: .end)
-//        one.add(point: ctrl1, pn: .endControl)
-//        var two = BezierStroke.BezierPoint(strokeId: UUID())
-//        two.add(point: lastPoint, pn: .end)
-//        two.add(point: ctrl2, pn: .startControl)
 ////        return [one, two]
     }
     
