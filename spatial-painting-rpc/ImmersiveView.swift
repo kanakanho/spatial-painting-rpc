@@ -19,6 +19,8 @@ struct ImmersiveView: View {
     
     @State private var latestRightIndexFingerCoordinates: simd_float4x4 = .init()
     @State private var lastIndexPose: SIMD3<Float>? = nil
+    @State private var initIndexPose: SIMD3<Float>? = nil
+
     @State private var sourceTransform: Transform? = nil
     
     @State private var lastControlIndexPose: SIMD3<Float>? = nil
@@ -54,6 +56,21 @@ struct ImmersiveView: View {
                     print("buttonPlateEntity not found")
                 }
                 
+                // added by nagao 2025/11/20
+                if let drawModeEntity: Entity = scene.findEntity(named: "draw"),
+                   let editModeEntity: Entity = scene.findEntity(named: "edit"),
+                   let bezierModelEntity: Entity = scene.findEntity(named: "bezier") {
+                    appModel.model.setModeEntities(drawModeEntity: drawModeEntity, editModeEntity: editModeEntity, bezierModeEntity: bezierModelEntity)
+                } else {
+                    if scene.findEntity(named: "draw") == nil {
+                        print("draw not found")
+                    } else if scene.findEntity(named: "edit") == nil {
+                        print("edit not found")
+                    } else if scene.findEntity(named: "bezier") == nil {
+                        print("bezier not found")
+                    }
+                }
+
                 appModel.rpcModel.painting.advancedColorPalletModel.setSceneEntity(scene: scene)
                 
                 /// ViewModel の Entity を RealityView に追加
@@ -61,7 +78,7 @@ struct ImmersiveView: View {
                 content.add(contentEntity)
                 
                 /// ColorPalletModel の初期化
-                appModel.model.initColorPalletNodel(colorPalletModel: appModel.rpcModel.painting.advancedColorPalletModel)
+                appModel.model.initColorPalletModel(colorPalletModel: appModel.rpcModel.painting.advancedColorPalletModel)
                 content.add(appModel.rpcModel.painting.advancedColorPalletModel.colorPalletEntity)
                 appModel.rpcModel.painting.advancedColorPalletModel.initEntity()
                 
@@ -75,11 +92,6 @@ struct ImmersiveView: View {
                 /// お絵描き中に移動した場所を記録する
                 root.components.set(ClosureComponent(closure: { (deltaTime: TimeInterval) in
                     var anchors: [HandAnchor] = []
-                    
-                    if let left: HandAnchor = appModel.model.latestHandTracking.left {
-                        anchors.append(left)
-                    }
-                    
                     if let right: HandAnchor = appModel.model.latestHandTracking.right {
                         anchors.append(right)
                     }
@@ -93,14 +105,13 @@ struct ImmersiveView: View {
                         let pinchThreshold: Float = 0.03
                         
                         if length(thumbPos - indexPos) < pinchThreshold {
-                            lastIndexPose = indexPos
-                            
-                            // もっとも近い制御点を探す
-                            if let nearestControlPoint = appModel.rpcModel.painting.paintingCanvas.gridPoints.findNearestPointInRadius(queryPoint: indexPos, radius: 0.02) {
-                                lastControlIndexPose = nearestControlPoint
-                            } else {
-                                lastControlIndexPose = indexPos
+                            if lastIndexPose == nil, initIndexPose == nil {
+                                initIndexPose = indexPos
                             }
+                            lastIndexPose = indexPos
+                        } else {
+                            lastIndexPose = nil
+                            initIndexPose = nil
                         }
                     }
                 }))
@@ -140,7 +151,7 @@ struct ImmersiveView: View {
             }
         }
         .onDisappear {
-            appModel.model.dismissHandArrowEntities()
+            appModel.model.dismissEntities()
             appModel.model.colorPalletModel.colorPalletEntity.children.removeAll()
         }
         .gesture(
@@ -148,13 +159,51 @@ struct ImmersiveView: View {
                 .simultaneously(with: MagnifyGesture())
                 .targetedToAnyEntity()
                 .onChanged({ (value: EntityTargetValue<SimultaneousGesture<DragGesture, MagnifyGesture>.Value>) in
-                    if appModel.rpcModel.painting.paintingCanvas.isControlMode {
-                        return
-                    }
-                    
                     if sourceTransform == nil {
                         sourceTransform = value.entity.transform
                     }
+
+                    if appModel.rpcModel.painting.paintingCanvas.isControlMode {
+                        if appModel.rpcModel.painting.paintingCanvas.isBezierSelected, let pos: SIMD3<Float> = lastIndexPose, let initPos: SIMD3<Float> = initIndexPose
+                        {
+                            let dist: Float = distance(initPos, pos)
+                            //print("Distance between pos and initPos: \(dist)")
+                            if dist < 0.01 || dist > 0.5 {
+                                return
+                            }
+                            
+                            let entity = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
+                            let comp = entity.components[BezierStrokeControlComponent.self]
+                            let entityPos: SIMD3<Float> = appModel.rpcModel.painting.paintingCanvas.selectedBezierPosition
+
+                            appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
+                                strokeId: comp!.bezierStrokeId,
+                                controlPointId: comp!.bezierPointId,
+                                controlType: comp!.controlType,
+                                newPosition: entityPos + pos - initPos
+                            )
+                            for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                                let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, entityPos + pos - initPos)
+                                _ = appModel.rpcModel.sendRequest(
+                                    RequestSchema(
+                                        peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                                        method: .moveControlPoint,
+                                        param: .moveControlPoint(
+                                            .init(
+                                                strokeId: comp!.bezierStrokeId,
+                                                controlPointId: comp!.bezierPointId,
+                                                controlType: comp!.controlType,
+                                                newPosition: clientPos
+                                            )
+                                        )
+                                    ),
+                                    mcPeerId: id
+                                )
+                            }
+                        }
+                        return
+                    }
+                    
                     /// 保存したストロークを再度表示させるための処理
                     if !appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty {
                         if value.entity.name == "boundingBox" {
@@ -162,13 +211,13 @@ struct ImmersiveView: View {
                             
                             if isHandGripped {
                                 // 例: ジェスチャ中の更新ハンドラ内
-                                if let t: Vector3D  = value.first?.translation3D,
+                                if let t: Vector3D = value.first?.translation3D,
                                    let src: Transform = sourceTransform {
                                     // ← ジェスチャ開始時に保存した Transform
 
                                     // 1) ドラッグ量 → 角度（ラジアン）に変換（係数は好みで調整）
                                     let radiansPerMeter: Float = 0.01
-                                    let yaw: Float   = Float(t.x) * radiansPerMeter // 水平ドラッグ → Yaw
+                                    let yaw: Float = Float(t.x) * radiansPerMeter // 水平ドラッグ → Yaw
                                     let pitch: Float = Float(t.y) * radiansPerMeter // 垂直ドラッグ → Pitch
 
                                     // 2) まずワールド Y 軸で Yaw を適用（turntable 風）
@@ -191,8 +240,8 @@ struct ImmersiveView: View {
                                 value.entity.transform.scale = [sourceTransform!.scale.x * magnification, sourceTransform!.scale.y * magnification, sourceTransform!.scale.z * magnification]
                                 
                                 value.entity.children.forEach { child in
-                                    appModel.rpcModel.painting.paintingCanvas.tmpStrokes.filter({ $0.root.components[StrokeComponent.self]?.uuid == child.components[StrokeComponent.self]?.uuid }).forEach { stroke in
-                                        stroke.updateMaxRadiusAndRemesh(scaleFactor: value.entity.transform.scale.sum() / 3)
+                                    appModel.rpcModel.painting.paintingCanvas.tmpStrokes.filter({ $0.root.components[StrokeRootComponent.self]?.uuid == child.components[StrokeRootComponent.self]?.uuid }).forEach { stroke in
+                                        stroke.updateMaxRadiusAndRemesh(scaleFactor: value.entity.transform.scale.sum() / 3.0)
                                     }
                                 }
                             } else if let translation: Vector3D = value.first?.translation3D {
@@ -232,7 +281,30 @@ struct ImmersiveView: View {
                     }
                 })
                 .onEnded({ _ in
+                    sourceTransform = nil
+                    lastIndexPose = nil
+                    initIndexPose = nil
+
                     if appModel.rpcModel.painting.paintingCanvas.isControlMode {
+                        if appModel.rpcModel.painting.paintingCanvas.isBezierSelected
+                        {
+                            let entity = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
+                            appModel.rpcModel.painting.paintingCanvas.setSelectedBezierPosition(entity.position(relativeTo: nil))
+                            let comp = entity.components[BezierStrokeControlComponent.self]
+                            _ = appModel.rpcModel.sendRequest(
+                                RequestSchema(
+                                    peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                                    method: .finishControlPoint,
+                                    param: .finishControlPoint(
+                                        .init(
+                                            strokeId: comp!.bezierStrokeId,
+                                            controlPointId: comp!.bezierPointId
+                                        )
+                                    )
+                                )
+                            )
+                            //print("Final position of controlpoint of bezierstroke: \(entity.position(relativeTo: nil))")
+                        }
                         return
                     }
                     
@@ -269,59 +341,7 @@ struct ImmersiveView: View {
                             )
                         )
                     }
-                    
-                    sourceTransform = nil
                 })
-        )
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .targetedToAnyEntity()
-                .onChanged { gesture in
-                    if let lastControlIndexPose: SIMD3<Float> = lastControlIndexPose,
-                       let bezierStrokeControlComponent: BezierStrokeControlComponent = gesture.entity.components[BezierStrokeControlComponent.self]
-                    {
-                        appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
-                            strokeId: bezierStrokeControlComponent.bezierStrokeId,
-                            controlPointId: bezierStrokeControlComponent.bezierPointId,
-                            controlType: bezierStrokeControlComponent.controlType,
-                            newPosition: lastControlIndexPose
-                        )
-                        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                            let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, lastControlIndexPose)
-                            _ = appModel.rpcModel.sendRequest(
-                                RequestSchema(
-                                    peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                                    method: .moveControlPoint,
-                                    param: .moveControlPoint(
-                                        .init(
-                                            strokeId: bezierStrokeControlComponent.bezierStrokeId,
-                                            controlPointId: bezierStrokeControlComponent.bezierPointId,
-                                            controlType: bezierStrokeControlComponent.controlType,
-                                            newPosition: clientPos
-                                        )
-                                    )
-                                ),
-                                mcPeerId: id
-                            )
-                        }
-                    }
-                }
-                .onEnded{ gesture in
-                    if let bezierStrokeControlComponent: BezierStrokeControlComponent = gesture.entity.components[BezierStrokeControlComponent.self] {
-                        _ = appModel.rpcModel.sendRequest(
-                            RequestSchema(
-                                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                                method: .finishControlPoint,
-                                param: .finishControlPoint(
-                                    .init(
-                                        strokeId: bezierStrokeControlComponent.bezierStrokeId,
-                                        controlPointId: bezierStrokeControlComponent.bezierPointId
-                                    )
-                                )
-                            )
-                        )
-                    }
-                }
         )
         .onChange(of: appModel.rpcModel.coordinateTransforms.affineMatrixs) {
             appModel.model.resetInitBall()
@@ -402,8 +422,17 @@ extension ImmersiveView {
         else if name == "eraser" {
             activateEraser(finger: finger)
         }
+        else if name == "bezierEndPoint" {
+            selectBezierEndPoint(event.entityB)
+        }
+        else if name == "bezierHandle" {
+            selectBezierHandle(event.entityB)
+        }
         else if event.entityB.hasStrokeRootComponent, appModel.model.isEraserMode, appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty, !appModel.rpcModel.painting.paintingCanvas.isControlMode {
             deleteStroke(event.entityB)
+        }
+        else if event.entityB.hasStrokeRootComponent, appModel.model.isSelectorMode {
+            selectStroke(event.entityB)
         }
         else if name == "button" {
             appModel.model.buttonEntity.transform.translation.y -= keyDownHeight
@@ -419,6 +448,87 @@ extension ImmersiveView {
             appModel.model.iconEntity3.transform.translation.z -= 0.005
             appModel.model.iconEntity3.orientation = simd_quatf(angle: 75.0 * .pi / 180.0, axis: SIMD3(1, 0, 0))
             _ = appModel.model.recordTime(isBegan: true)
+        }
+        else if name == "draw" {
+            appModel.model.authoringMode = .draw
+            appModel.rpcModel.painting.paintingCanvas.setIsControlMode(false)
+            appModel.model.resetColor()
+            appModel.rpcModel.painting.paintingCanvas.setActiveColor(userId: appModel.mcPeerIDUUIDWrapper.myId, color: SimpleMaterial.Color.white)
+            appModel.model.colorPalletModel.setActiveColor(color: SimpleMaterial.Color.white)
+            let mat = SimpleMaterial(
+                color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 1.0),
+                isMetallic: false
+            )
+            finger.components.set(
+                ModelComponent(
+                    mesh: .generateSphere(radius: 0.01),
+                    materials: [mat]
+                )
+            )
+            if appModel.rpcModel.painting.paintingCanvas.confirmMovingStrokes() {
+                sendTmpStrokes()
+            }
+            appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
+            appModel.model.isSelectorMode = false
+        }
+        else if name == "edit" {
+            appModel.model.authoringMode = .edit
+            appModel.rpcModel.painting.paintingCanvas.setIsControlMode(false)
+            appModel.model.resetColor()
+            let mat = SimpleMaterial(
+                color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 1.0),
+                isMetallic: true
+            )
+            finger.components.set(
+                ModelComponent(
+                    mesh: .generateSphere(radius: 0.01),
+                    materials: [mat]
+                )
+            )
+            if appModel.rpcModel.painting.paintingCanvas.confirmMovingStrokes() {
+                sendTmpStrokes()
+            }
+            appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
+            appModel.model.isEraserMode = false
+            appModel.model.isSelectorMode = true
+        }
+        else if name == "bezier" {
+            appModel.model.authoringMode = .bezier
+            if appModel.rpcModel.painting.paintingCanvas.confirmMovingStrokes() {
+                sendTmpStrokes()
+            }
+            appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
+            appModel.model.resetColor()
+            let mat = SimpleMaterial(
+                color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.2),
+                isMetallic: false
+            )
+            finger.components.set(
+                ModelComponent(
+                    mesh: .generateSphere(radius: 0.01),
+                    materials: [mat]
+                )
+            )
+            appModel.model.isEraserMode = false
+            appModel.model.isSelectorMode = false
+
+            let prev = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
+            let flag = appModel.rpcModel.painting.paintingCanvas.isBezierSelected
+            if flag {
+                let mat = SimpleMaterial(
+                    color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.1),
+                    isMetallic: true
+                )
+                prev.components.set(
+                    ModelComponent(
+                        mesh: .generateBox(size: 1.0, cornerRadius: 0.0),
+                        materials: [mat]
+                    )
+                )
+                appModel.rpcModel.painting.paintingCanvas.setSelectedBezierEntity(Entity())
+                appModel.rpcModel.painting.paintingCanvas.setIsBezierSelected(false)
+            }
+            appModel.rpcModel.painting.paintingCanvas.setIsControlMode(true)
         }
     }
     
@@ -444,44 +554,6 @@ extension ImmersiveView {
                     )
                 )
             )
-            
-            if appModel.rpcModel.painting.advancedColorPalletModel.selectedBasicColorName == name {
-                return
-            }
-            guard let colorBall: ColorBall = appModel.rpcModel.painting.advancedColorPalletModel.colorBalls.get(withID: name) else { return }
-            let prev: String = appModel.rpcModel.painting.advancedColorPalletModel.selectedBasicColorName
-            if !prev.isEmpty {
-                if colorBall.isBasic || name.hasPrefix("m") {
-                    if let prevEntity = appModel.rpcModel.painting.advancedColorPalletModel.colorEntityDictionary[prev] {
-                        prevEntity.setScale(SIMD3<Float>(repeating: 0.01), relativeTo: nil)
-                        if appModel.rpcModel.painting.advancedColorPalletModel.colorBalls.get(withID: prev) != nil {
-                            let subColorBalls: [ColorBall] = appModel.rpcModel.painting.advancedColorPalletModel.colorBalls.filterByID(containing: String(prev.prefix(1)), isBasic: false)
-                            for cb: ColorBall in subColorBalls {
-                                if let entity2: Entity = appModel.rpcModel.painting.advancedColorPalletModel.colorEntityDictionary[cb.id] {
-                                    entity2.removeFromParent()
-                                }
-                            }
-                        }
-                    }
-                    appModel.rpcModel.painting.advancedColorPalletModel.selectedBasicColorName = ""
-                }
-            }
-            if appModel.rpcModel.painting.advancedColorPalletModel.colorDictionary[name] != nil {
-                if let colorEntity = appModel.rpcModel.painting.advancedColorPalletModel.colorEntityDictionary[name] {
-                    if colorBall.isBasic {
-                        colorEntity.setScale(SIMD3<Float>(repeating: 0.013), relativeTo: nil)
-                        let subColorBalls: [ColorBall] = appModel.rpcModel.painting.advancedColorPalletModel.colorBalls.filterByID(containing: String(name.prefix(1)), isBasic: false)
-                        for cb: ColorBall in subColorBalls {
-                            if let entity2: Entity =
-                                appModel.rpcModel.painting.advancedColorPalletModel.colorEntityDictionary[cb.id] {
-                                appModel.rpcModel.painting.advancedColorPalletModel.colorPalletEntity.addChild(entity2)
-                            }
-                        }
-                        appModel.rpcModel.painting.advancedColorPalletModel.selectedBasicColorName = name
-                    }
-                }
-            }
-            
             if let color: UIColor =
                 appModel.rpcModel.painting.advancedColorPalletModel.colorDictionary[name] {
                 let material: SimpleMaterial = SimpleMaterial(color: color, isMetallic: false)
@@ -530,8 +602,13 @@ extension ImmersiveView {
     // MARK: — Began-handlers
     private func didTouchColor(_ name: String, finger: Entity) {
         appModel.model.changeFingerColor(entity: finger, colorName: name)
-        appModel.rpcModel.painting.paintingCanvas.setMaxRadius(userId: appModel.mcPeerIDUUIDWrapper.myId, radius: 0.01)
-        appModel.model.isEraserMode = false
+        if appModel.model.authoringMode == .edit {
+            let color: UIColor = appModel.model.getColor(colorName: name)
+            appModel.rpcModel.painting.paintingCanvas.changeColorOfMovingStrokes(color)
+        } else if appModel.model.authoringMode == .draw {
+            appModel.rpcModel.painting.paintingCanvas.setMaxRadius(userId: appModel.mcPeerIDUUIDWrapper.myId, radius: 0.01)
+            appModel.model.isEraserMode = false
+        }
     }
     
     private func didTouchTool(_ name: String, finger: Entity) {
@@ -553,7 +630,12 @@ extension ImmersiveView {
             let material: SimpleMaterial = SimpleMaterial(color: activeColor, isMetallic: false)
             finger.components.set(ModelComponent(mesh: .generateSphere(radius: Float(toolBall.lineWidth)), materials: [material]))
         }
-        appModel.model.isEraserMode = false
+        if appModel.model.authoringMode == .edit {
+            let lineWidth: Float = appModel.model.getLineWidth(toolName: name)
+            appModel.rpcModel.painting.paintingCanvas.changeLineWidthOfMovingStrokes(lineWidth)
+        } else if appModel.model.authoringMode == .draw {
+            appModel.model.isEraserMode = false
+        }
     }
     
     private func activateEraser(finger: Entity) {
@@ -575,7 +657,6 @@ extension ImmersiveView {
     
     private func deleteStroke(_ entity: Entity) {
         guard let comp: StrokeRootComponent = entity.components[StrokeRootComponent.self] else { return }
-        print("Removing stroke with UUID: \(comp.uuid)")
         _ = appModel.rpcModel.sendRequest(
             RequestSchema(
                 peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
@@ -585,12 +666,117 @@ extension ImmersiveView {
         )
     }
     
+    // added by nagao 2025/11/21
+    private func selectStroke(_ entity: Entity) {
+        guard let comp: StrokeRootComponent = entity.components[StrokeRootComponent.self] else { return }
+        let stroke: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.strokes.filter {
+            $0.root.components[StrokeRootComponent.self]?.uuid == comp.uuid
+        }
+        if stroke.count == 0 { return }
+        appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
+        appModel.rpcModel.painting.paintingCanvas.addMovingStrokes(stroke.first!)
+        // tmpStrokeに追加
+        appModel.rpcModel.painting.paintingCanvas.addTmpStrokes(appModel.rpcModel.painting.paintingCanvas.movingStrokes)
+        
+        if !appModel.model.colorPalletModel.colorPalletEntity.isEnabled {
+            deleteStroke(entity)
+        }
+    }
+
+    // added by nagao 2025/11/26
+    private func selectBezierEndPoint(_ entity: Entity) {
+        let prev = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
+        let flag = appModel.rpcModel.painting.paintingCanvas.isBezierSelected
+        if flag, prev != entity {
+            let mat = SimpleMaterial(
+                color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.1),
+                isMetallic: true
+            )
+            prev.components.set(
+                ModelComponent(
+                    mesh: .generateBox(size: 1.0, cornerRadius: 0.0),
+                    materials: [mat]
+                )
+            )
+        } else if prev == entity {
+            return
+        }
+        let mat = SimpleMaterial(
+            color: UIColor(red: 255/255, green: 215/255, blue: 0/255, alpha: 1.0),
+            isMetallic: true
+        )
+        entity.components.set(
+            ModelComponent(
+                mesh: .generateBox(size: 1.1, cornerRadius: 0.0),
+                materials: [mat]
+            )
+        )
+        appModel.rpcModel.painting.paintingCanvas.setSelectedBezierEntity(entity)
+        appModel.model.colorPalletModel.playBezierPointSound()
+    }
+    private func selectBezierHandle(_ entity: Entity) {
+        let prev = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
+        let flag = appModel.rpcModel.painting.paintingCanvas.isBezierSelected
+        if flag, prev != entity {
+            let mat = SimpleMaterial(
+                color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.1),
+                isMetallic: true
+            )
+            prev.components.set(
+                ModelComponent(
+                    mesh: .generateBox(size: 1.0, cornerRadius: 0.0),
+                    materials: [mat]
+                )
+            )
+        } else if prev == entity {
+            return
+        }
+        let mat = SimpleMaterial(
+            color: .red,
+            isMetallic: true
+        )
+        entity.components.set(
+            ModelComponent(
+                mesh: .generateSphere(radius: 5.0),
+                materials: [mat]
+            )
+        )
+        appModel.rpcModel.painting.paintingCanvas.setSelectedBezierEntity(entity)
+        appModel.model.colorPalletModel.playBezierHandleSound()
+    }
+
+    private func sendTmpStrokes() {
+        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+            let transformedStrokes: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: BezierStroke) in
+                // points 全てにアフィン変換を適用
+                let tmpRootTransfromPoints: [SIMD4<Float>] = stroke.points.map { (point: SIMD3<Float>) in
+                    return stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
+                }
+                let transformedPoints: [SIMD3<Float>] = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
+                    matmul4x4_4x1(affineMatrix, point)
+                }
+                let transformedStroke: BezierStroke = BezierStroke(uuid: stroke.uuid, points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
+                transformedStroke.bezierPoints = stroke.bezierPoints.getPoints(affine: affineMatrix)
+                return transformedStroke
+            })
+            _ = appModel.rpcModel.sendRequest(
+                .init(
+                    peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                    method: .addBezierStrokes,
+                    param: .addBezierStrokes(.init(strokes: transformedStrokes))
+                ),
+                mcPeerId: id
+            )
+        }
+    }
+
     // MARK: — Ended-handlers
     private func toggleStrokeWindow() {
         if !appModel.externalStrokeFileWapper.isFileManagerActive {
             openWindow(id: "ExternalStroke")
         } else {
-            print("FileManager is already active.")
+            //print("FileManager is already active.")
+            appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
             for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
                 let transformedStrokes: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: BezierStroke) in
                     // points 全てにアフィン変換を適用
@@ -600,18 +786,20 @@ extension ImmersiveView {
                     let transformedPoints: [SIMD3<Float>] = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
                         matmul4x4_4x1(affineMatrix, point)
                     }
-                    return BezierStroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
+                    let transformedStroke: BezierStroke = BezierStroke(uuid: stroke.uuid, points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
+                    transformedStroke.bezierPoints = stroke.bezierPoints.getPoints(affine: affineMatrix)
+                    return transformedStroke
                 })
                 _ = appModel.rpcModel.sendRequest(
                     .init(
                         peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                        method: .addStrokes,
-                        param: .addStrokes(.init(strokes: transformedStrokes))
+                        method: .addBezierStrokes,
+                        param: .addBezierStrokes(.init(strokes: transformedStrokes))
                     ),
                     mcPeerId: id
                 )
             }
-            appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
+            appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
             DispatchQueue.main.async {
                 dismissWindow(id: "ExternalStroke")
             }

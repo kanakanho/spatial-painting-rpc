@@ -10,6 +10,7 @@
 
 def Xform "Root"
 {
+    reorder nameChildren = ["BasicColors", "Grayscale", "LineWidth", "collider", "RedColors", "OrangeColors", "YellowColors", "GreenColors", "CyanColors", "BlueColors", "VioletColors", "PinkColors", "board", "bezierEndPoint", "bezierHandle", "bezier", "edit", "draw", "bezierHandle1"]
     def "BasicColors" (
         active = true
         references = @BasicColors.usdz@
@@ -230,6 +231,89 @@ def Xform "Root"
                     }
                 }
             }
+
+            over "color"
+            {
+                over "r1_6"
+                {
+                    over "UsdPreviewSurface"
+                    {
+                        color3f inputs:emissiveColor = (0, 0, 0) (
+                            colorSpace = "srgb_displayp3"
+                        )
+                    }
+                }
+
+                over "o1_6"
+                {
+                    over "UsdPreviewSurface"
+                    {
+                        color3f inputs:emissiveColor = (0, 0, 0) (
+                            colorSpace = "srgb_displayp3"
+                        )
+                    }
+                }
+
+                over "y1_6"
+                {
+                    over "UsdPreviewSurface"
+                    {
+                        color3f inputs:emissiveColor = (0, 0, 0) (
+                            colorSpace = "srgb_displayp3"
+                        )
+                    }
+                }
+
+                over "g1_6"
+                {
+                    over "UsdPreviewSurface"
+                    {
+                        color3f inputs:emissiveColor = (0, 0, 0) (
+                            colorSpace = "srgb_displayp3"
+                        )
+                    }
+                }
+
+                over "c1_6"
+                {
+                    over "UsdPreviewSurface"
+                    {
+                        color3f inputs:emissiveColor = (0, 0, 0) (
+                            colorSpace = "srgb_displayp3"
+                        )
+                    }
+                }
+
+                over "b1_6"
+                {
+                    over "UsdPreviewSurface"
+                    {
+                        color3f inputs:emissiveColor = (0, 0, 0) (
+                            colorSpace = "srgb_displayp3"
+                        )
+                    }
+                }
+
+                over "v1_6"
+                {
+                    over "UsdPreviewSurface"
+                    {
+                        color3f inputs:emissiveColor = (0, 0, 0) (
+                            colorSpace = "srgb_displayp3"
+                        )
+                    }
+                }
+
+                over "p1_6"
+                {
+                    over "UsdPreviewSurface"
+                    {
+                        color3f inputs:emissiveColor = (0, 0, 0) (
+                            colorSpace = "srgb_displayp3"
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -397,6 +481,59 @@ def Xform "Root"
                         {
                         }
                     }
+                }
+            }
+        }
+
+        over "mono"
+        {
+            over "m1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "m2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "m3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "m4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "m5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
                 }
             }
         }
@@ -569,6 +706,22 @@ def Xform "Root"
                 }
             }
         }
+
+        over "tools"
+        {
+            over "size"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:diffuseColor = (0.7490196, 0.7490196, 0.7490196) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+        }
     }
 
     def "collider" (
@@ -622,6 +775,12 @@ def Xform "Root"
                     token outputs:out
                     float2 ui:nodegraph:node:pos = (-255, 105)
                 }
+            }
+
+            over "defaultMaterial"
+            {
+                token outputs:mtlx:surface
+                token outputs:realitykit:vertex
             }
         }
 
@@ -1076,8 +1235,14 @@ def Xform "Root"
                 }
             }
 
-            over "r3_5"
+            over "r3_5" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
             {
+                rel material:binding = </Root/RedColors/color_red/r3_5> (
+                    bindMaterialAs = "weakerThanDescendants"
+                )
+
                 def RealityKitComponent "InputTarget"
                 {
                     uniform token info:id = "RealityKit.InputTarget"
@@ -1593,6 +1758,369 @@ def Xform "Root"
                         {
                         }
                     }
+                }
+            }
+        }
+
+        over "color_red"
+        {
+            over "r1_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r1_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r1_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r1_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r1_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r1_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r2_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r2_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r2_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r2_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r2_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r2_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r3_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r3_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r3_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r3_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r3_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r3_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r4_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r4_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r4_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r4_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r4_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r4_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r5_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r5_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r5_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r5_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r5_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r5_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r6_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r6_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r6_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r6_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r6_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "r6_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
                 }
             }
         }
@@ -2545,6 +3073,369 @@ def Xform "Root"
                 }
             }
         }
+
+        over "color_orange"
+        {
+            over "o1_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o1_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o1_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o1_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o1_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o1_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o2_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o2_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o2_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o2_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o2_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o2_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o3_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o3_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o3_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o3_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o3_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o3_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o4_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o4_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o4_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o4_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o4_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o4_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o5_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o5_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o5_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o5_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o5_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o5_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o6_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o6_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o6_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o6_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o6_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "o6_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+        }
     }
 
     def "YellowColors" (
@@ -3491,6 +4382,369 @@ def Xform "Root"
                         {
                         }
                     }
+                }
+            }
+        }
+
+        over "color_yellow"
+        {
+            over "y1_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y1_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y1_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y1_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y1_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y1_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y2_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y2_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y2_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y2_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y2_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y2_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y3_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y3_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y3_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y3_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y3_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y3_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y4_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y4_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y4_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y4_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y4_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y4_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y5_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y5_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y5_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y5_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y5_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y5_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y6_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y6_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y6_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y6_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y6_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "y6_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
                 }
             }
         }
@@ -4443,6 +5697,369 @@ def Xform "Root"
                 }
             }
         }
+
+        over "color_green"
+        {
+            over "g1_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g1_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g1_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g1_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g1_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g1_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g2_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g2_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g2_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g2_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g2_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g2_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g3_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g3_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g3_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g3_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g3_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g3_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g4_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g4_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g4_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g4_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g4_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g4_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g5_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g5_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g5_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g5_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g5_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g5_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g6_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g6_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g6_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g6_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g6_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "g6_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+        }
     }
 
     def "CyanColors" (
@@ -5389,6 +7006,369 @@ def Xform "Root"
                         {
                         }
                     }
+                }
+            }
+        }
+
+        over "color_cyan"
+        {
+            over "c1_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c1_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c1_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c1_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c1_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c1_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c2_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c2_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c2_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c2_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c2_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c2_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c3_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c3_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c3_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c3_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c3_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c3_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c4_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c4_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c4_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c4_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c4_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c4_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c5_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c5_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c5_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c5_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c5_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c5_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c6_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c6_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c6_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c6_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c6_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "c6_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
                 }
             }
         }
@@ -6341,6 +8321,369 @@ def Xform "Root"
                 }
             }
         }
+
+        over "color_blue"
+        {
+            over "b1_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b1_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b1_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b1_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b1_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b1_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b2_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b2_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b2_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b2_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b2_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b2_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b3_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b3_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b3_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b3_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b3_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b3_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b4_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b4_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b4_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b4_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b4_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b4_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b5_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b5_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b5_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b5_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b5_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b5_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b6_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b6_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b6_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b6_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b6_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "b6_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+        }
     }
 
     def "VioletColors" (
@@ -7287,6 +9630,369 @@ def Xform "Root"
                         {
                         }
                     }
+                }
+            }
+        }
+
+        over "color_violet"
+        {
+            over "v1_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v1_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v1_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v1_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v1_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v1_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v2_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v2_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v2_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v2_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v2_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v2_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v3_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v3_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v3_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v3_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v3_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v3_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v4_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v4_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v4_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v4_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v4_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v4_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v5_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v5_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v5_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v5_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v5_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v5_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v6_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v6_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v6_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v6_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v6_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "v6_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
                 }
             }
         }
@@ -8239,6 +10945,369 @@ def Xform "Root"
                 }
             }
         }
+
+        over "color_pink"
+        {
+            over "p6_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p6_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p6_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p6_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p6_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p6_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p5_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p5_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p5_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p5_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p5_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p5_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p4_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p4_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p4_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p4_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p4_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p4_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p3_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p3_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p3_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p3_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p3_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p3_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p2_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p2_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p2_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p2_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p2_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p2_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p1_6"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p1_5"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p1_4"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p1_3"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p1_2"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+
+            over "p1_1"
+            {
+                over "UsdPreviewSurface"
+                {
+                    color3f inputs:emissiveColor = (0, 0, 0) (
+                        colorSpace = "srgb_displayp3"
+                    )
+                }
+            }
+        }
     }
 
     def "board" (
@@ -8371,7 +11440,7 @@ def Xform "Root"
 
     def "bezierEndPoint" (
         active = true
-        prepend references = @bezierEndPoint.usdz@
+        references = @bezierEndPoint.usdz@
     )
     {
         float3 xformOp:scale = (0.02, 0.02, 0.02)
@@ -8403,7 +11472,7 @@ def Xform "Root"
 
     def "bezierHandle" (
         active = true
-        prepend references = @bezierHandle.usdz@
+        references = @bezierHandle.usdz@
     )
     {
         float3 xformOp:scale = (0.002, 0.002, 0.002)
@@ -8453,6 +11522,199 @@ def Xform "Root"
             def RealityKitStruct "Shape"
             {
                 float3 extent = (10, 10, 10)
+                token shapeType = "Box"
+
+                def RealityKitStruct "pose"
+                {
+                }
+            }
+        }
+    }
+
+    def "bezier" (
+        active = true
+        references = @bezier_1.usdz@
+    )
+    {
+        float3 xformOp:scale = (1, 1, 1)
+        float3 xformOp:translate = (0.06, 0, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "color_cube"
+        {
+            over "XID_AcrylicClear_2BD310009123A0426B9C341AB7FF6F6F_Post2015_Post2015_shader"
+            {
+                color3f inputs:diffuseColor = (1, 0.8745098, 0.49803922) (
+                    colorSpace = "lin_srgb"
+                )
+                color3f inputs:emissiveColor = (1, 0.8745098, 0.49803922) (
+                    colorSpace = "lin_srgb"
+                )
+                float inputs:opacity = 0.05
+                float inputs:opacityThreshold = 0
+            }
+        }
+
+        over "color_line"
+        {
+            over "XID_SteelSatin_2BD31000A1B9C54BE09D5589EF37BFDE_Post2015_shader"
+            {
+                color3f inputs:emissiveColor = (0.49803922, 0.49803922, 0.49803922) (
+                    colorSpace = "lin_srgb"
+                )
+                float inputs:opacityThreshold = 0
+            }
+        }
+
+        over "color_handle"
+        {
+            over "XID_SteelSatin_2BD31000A1B9C54BE09D5589EF37BFDE_Post2015_shader"
+            {
+                float inputs:opacityThreshold = 0
+            }
+        }
+
+        over "color_handle_cube"
+        {
+            over "XID_SteelSatin_2BD31000A1B9C54BE09D5589EF37BFDE_Post2015_shader"
+            {
+                float inputs:opacityThreshold = 0
+            }
+        }
+
+        def RealityKitComponent "InputTarget"
+        {
+            uniform token info:id = "RealityKit.InputTarget"
+        }
+
+        def RealityKitComponent "Collider"
+        {
+            uint group = 1
+            uniform token info:id = "RealityKit.Collider"
+            uint mask = 4294967295
+            token type = "Default"
+
+            def RealityKitStruct "Shape"
+            {
+                float3 extent = (0.039999988, 0.039999988, 0.039999988)
+                token shapeType = "Box"
+
+                def RealityKitStruct "pose"
+                {
+                }
+            }
+        }
+    }
+
+    def "edit" (
+        active = true
+        references = @edit_5.usdz@
+    )
+    {
+        float3 xformOp:scale = (1, 1, 1)
+        float3 xformOp:translate = (0, 0, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "color_cube"
+        {
+            over "XID_AcrylicClear_2BD310009123A0426B9C341AB7FF6F6F_Post2015_Post2015_shader"
+            {
+                color3f inputs:diffuseColor = (1, 0.8745098, 0.49803922) (
+                    colorSpace = "lin_srgb"
+                )
+                color3f inputs:emissiveColor = (1, 0.8745098, 0.49803922) (
+                    colorSpace = "lin_srgb"
+                )
+                float inputs:opacity = 0.05
+                float inputs:opacityThreshold = 0
+            }
+        }
+
+        over "color_line_white"
+        {
+            over "XID_SteelSatin_2BD31000A1B9C54BE09D5589EF37BFDE_Post2015_shader"
+            {
+                float inputs:opacityThreshold = 0
+            }
+        }
+
+        over "color_line_red"
+        {
+            over "XID_SteelSatin_2BD31000A1B9C54BE09D5589EF37BFDE_Post2015_shader"
+            {
+                color3f inputs:diffuseColor = (0.24705882, 0.12156863, 0) (
+                    colorSpace = "lin_srgb"
+                )
+                color3f inputs:emissiveColor = (0.24705882, 0.12156863, 0) (
+                    colorSpace = "lin_srgb"
+                )
+                float inputs:opacityThreshold = 0
+            }
+        }
+
+        over "color_cube_gray"
+        {
+            over "XID_AcrylicClear_2BD310009123A0426B9C341AB7FF6F6F_Post2015_Post2015_shader"
+            {
+                color3f inputs:diffuseColor = (1, 1, 1) (
+                    colorSpace = "lin_srgb"
+                )
+                color3f inputs:emissiveColor = (1, 1, 1) (
+                    colorSpace = "lin_srgb"
+                )
+                float inputs:opacity = 0.1
+                float inputs:opacityThreshold = 0
+            }
+        }
+
+        def RealityKitComponent "InputTarget"
+        {
+            uniform token info:id = "RealityKit.InputTarget"
+        }
+
+        def RealityKitComponent "Collider"
+        {
+            uint group = 1
+            uniform token info:id = "RealityKit.Collider"
+            uint mask = 4294967295
+            token type = "Default"
+
+            def RealityKitStruct "Shape"
+            {
+                float3 extent = (0.040000003, 0.040000003, 0.040000003)
+                token shapeType = "Box"
+
+                def RealityKitStruct "pose"
+                {
+                }
+            }
+        }
+    }
+
+    def "draw" (
+        active = true
+        references = @draw_5.usdz@
+    )
+    {
+        float3 xformOp:scale = (1, 1, 1)
+        float3 xformOp:translate = (-0.06, 0, 0.25)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def RealityKitComponent "InputTarget"
+        {
+            uniform token info:id = "RealityKit.InputTarget"
+        }
+
+        def RealityKitComponent "Collider"
+        {
+            uint group = 1
+            uniform token info:id = "RealityKit.Collider"
+            uint mask = 4294967295
+            token type = "Default"
+
+            def RealityKitStruct "Shape"
+            {
+                float3 extent = (0.04000002, 0.04000002, 0.040000003)
                 token shapeType = "Box"
 
                 def RealityKitStruct "pose"

@@ -48,8 +48,8 @@ class Painting:ObservableObject {
     }
     
     /// 複数のストロークを追加する
-    func addStrokes(param: AddStrokesParam) {
-        paintingCanvas.addStrokes(param.strokes)
+    func addBezierStrokes(param: AddBezierStrokesParam) {
+        paintingCanvas.addBezierStrokes(param.strokes)
     }
     
     /// 線の太さを変更する
@@ -89,7 +89,7 @@ struct PaintingEntity: RPCEntity {
         case removeAllStroke
         case removeStroke
         case addStrokePoint
-        case addStrokes
+        case addBezierStrokes
         case addBezierStrokePoints
         case finishStroke
         case changeFingerLineWidth
@@ -102,7 +102,7 @@ struct PaintingEntity: RPCEntity {
         case removeAllStroke(RemoveAllStrokeParam)
         case removeStroke(RemoveStrokeParam)
         case addStrokePoint(AddStrokePointParam)
-        case addStrokes(AddStrokesParam)
+        case addBezierStrokes(AddBezierStrokesParam)
         case addBezierStrokePoints(AddBezierStrokePointsParam)
         case finishStroke(FinishStrokeParam)
         case changeFingerLineWidth(ChangeFingerLineWidthParam)
@@ -127,7 +127,7 @@ struct PaintingEntity: RPCEntity {
             let userId: UUID
         }
         
-        struct AddStrokesParam: Codable {
+        struct AddBezierStrokesParam: Codable {
             let strokes: [BezierStroke]
         }
         
@@ -168,8 +168,8 @@ struct PaintingEntity: RPCEntity {
                 try container.encode(param, forKey: .removeStroke)
             case .addStrokePoint(let param):
                 try container.encode(param, forKey: .addStrokePoint)
-            case .addStrokes(let param):
-                try container.encode(param, forKey: .addStrokes)
+            case .addBezierStrokes(let param):
+                try container.encode(param, forKey: .addBezierStrokes)
             case .addBezierStrokePoints(let param):
                 try container.encode(param, forKey: .addBezierStrokePoints)
             case .finishStroke(let param):
@@ -193,8 +193,8 @@ struct PaintingEntity: RPCEntity {
                 self = .removeStroke(param)
             } else if let param = try? container.decode(AddStrokePointParam.self, forKey: .addStrokePoint) {
                 self = .addStrokePoint(param)
-            } else if let param = try? container.decode(AddStrokesParam.self, forKey: .addStrokes) {
-                self = .addStrokes(param)
+            } else if let param = try? container.decode(AddBezierStrokesParam.self, forKey: .addBezierStrokes) {
+                self = .addBezierStrokes(param)
             } else if let param = try? container.decode(AddBezierStrokePointsParam.self, forKey: .addBezierStrokePoints) {
                 self = .addBezierStrokePoints(param)
             } else if let param = try? container.decode(FinishStrokeParam.self, forKey: .finishStroke) {
@@ -215,7 +215,7 @@ struct PaintingEntity: RPCEntity {
             case removeAllStroke
             case removeStroke
             case addStrokePoint
-            case addStrokes
+            case addBezierStrokes
             case addBezierStrokePoints
             case finishStroke
             case changeFingerLineWidth
@@ -229,7 +229,7 @@ typealias SetStrokeColorParam = PaintingEntity.Param.SetStrokeColorParam
 typealias RemoveAllStrokesParam = PaintingEntity.Param.RemoveAllStrokeParam
 typealias RemoveStrokeParam = PaintingEntity.Param.RemoveStrokeParam
 typealias AddStrokePointParam = PaintingEntity.Param.AddStrokePointParam
-typealias AddStrokesParam = PaintingEntity.Param.AddStrokesParam
+typealias AddBezierStrokesParam = PaintingEntity.Param.AddBezierStrokesParam
 typealias AddBezierStrokePointsParam = PaintingEntity.Param.AddBezierStrokePointsParam
 typealias FinishStrokeParam = PaintingEntity.Param.FinishStrokeParam
 typealias ChangeFingerLineWidthParam = PaintingEntity.Param.ChangeFingerLineWidthParam

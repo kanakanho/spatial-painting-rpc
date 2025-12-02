@@ -21,7 +21,7 @@ extension ModelEntity {
     class func createFingertip(name: String, color: UIColor) -> ModelEntity {
         let entity = ModelEntity(
             mesh: .generateSphere(radius: 0.01),
-            materials: [SimpleMaterial(color: color, isMetallic: true)],
+            materials: [SimpleMaterial(color: color, isMetallic: false)],//modified 2025/11/20
             collisionShape: .generateSphere(radius: 0.01),
             mass: 0.0
         )

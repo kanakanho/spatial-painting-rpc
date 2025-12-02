@@ -102,6 +102,7 @@ struct ExternalStrokeView: View {
                 
                 // ロードしたデータの確定
                 Button("Confirm Loaded Stroke") {
+                    appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
                     for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
                         let transformedStrokes: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: BezierStroke) in
                             // points 全てにアフィン変換を適用
@@ -109,20 +110,22 @@ struct ExternalStrokeView: View {
                                 return stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
                             }
                             let transformedPoints: [SIMD3<Float>] = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
-                                return matmul4x4_4x1(affineMatrix, point)
+                                matmul4x4_4x1(affineMatrix, point)
                             }
-                            return BezierStroke(uuid: UUID(), points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
+                            let transformedStroke: BezierStroke = BezierStroke(uuid: stroke.uuid, points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
+                            transformedStroke.bezierPoints = stroke.bezierPoints.getPoints(affine: affineMatrix)
+                            return transformedStroke
                         })
                         _ = appModel.rpcModel.sendRequest(
                             .init(
                                 peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                                method: .addStrokes,
-                                param: .addStrokes(.init(strokes: transformedStrokes))
+                                method: .addBezierStrokes,
+                                param: .addBezierStrokes(.init(strokes: transformedStrokes))
                             ),
                             mcPeerId: id
                         )
                     }
-                    appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
+                    appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
                     // isLoading を false にしてロードモードを終了
                     isLoading = false
                 }

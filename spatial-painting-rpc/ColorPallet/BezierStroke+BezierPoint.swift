@@ -71,20 +71,20 @@ extension BezierStroke {
         
         func setEntities(bezierEndPoint: Entity, bezierHandle: Entity) {
             self.endEntity.removeFromParent()
-            self.startHandleEntity.removeFromParent()
-            self.endHandleEntity.removeFromParent()
+            self.startHandleEntity.removeFromParent()
+            self.endHandleEntity.removeFromParent()
 
-            self.endEntity = bezierEndPoint
-            self.endHandleEntity = bezierHandle.clone(recursive: true)
-            self.startHandleEntity = bezierHandle.clone(recursive: true)
-            
-            self.endEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
-            self.startHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
-            self.endHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
-            
-            self.endEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .end))
-            self.startHandleEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .startControl))
-            self.endHandleEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .endControl))
+            self.endEntity = bezierEndPoint
+            self.endHandleEntity = bezierHandle.clone(recursive: true)
+            self.startHandleEntity = bezierHandle.clone(recursive: true)
+            
+            self.endEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
+            self.startHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
+            self.endHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
+            
+            self.endEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .end))
+            self.startHandleEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .startControl))
+            self.endHandleEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .endControl))
             
             self.root.addChild(self.endEntity)
             self.root.addChild(self.startHandleEntity)

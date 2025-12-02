@@ -54,10 +54,6 @@ struct ContentView: View {
                 }
             }
             Spacer()
-            
-            Button(appModel.rpcModel.painting.paintingCanvas.isControlMode ? "Disable Control Mode" : "Enable Control Mode") {
-                appModel.rpcModel.painting.paintingCanvas.isControlModeToggle()
-            }
         }
         .padding()
         .onAppear() {

@@ -80,26 +80,29 @@ class BezierStroke: Codable {
         let radiusFloor: Float = 0.3 * self.originalMaxRadius // 下限
         self.maxRadius = min(max(scaled, radiusFloor), radiusCap)
         //print("Stroke maxRadius: \(self.maxRadius)")
-        self.updateMesh()
+        self.updateMesh(false)
     }
     
     /// Update the mesh with the points of the stroke if it already exists,
     /// or create a new one with the given mesh data.
-    func updateMesh() {
-        if !bezierPoints.beziers.isEmpty {
-            points = beziers2Points(beziers: bezierPoints.beziers, resolution: 16)
+    func updateMesh(_ flag: Bool = true) {
+        if flag {
+            if !bezierPoints.beziers.isEmpty {
+                points = beziers2Points(beziers: bezierPoints.beziers, resolution: 16)
+            }
         }
 
         /// The starting point where the stroke mesh begins.
         guard let center = points.first,
               let last = points.last else { return }
-        
-        
-        /// 最後の点を追加
-        if !bezierPoints.beziers.isEmpty {
-            points.append(last)
+
+        if flag {
+            /// 最後の点を追加
+            if !bezierPoints.beziers.isEmpty {
+                points.append(last)
+            }
         }
-        
+
         /// The position, normals, and triangle indices that the points generate.
         let (positions, normals, triangles) = generateMeshData()
         
@@ -122,6 +125,8 @@ class BezierStroke: Codable {
         if let mesh = stroke.model?.mesh {
             do {
                 try mesh.replace(with: contents)
+                // マテリアルを更新 added by nagao 2025/11/21
+                stroke.model?.materials = [SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)]
             } catch {
                 print("Error replacing mesh: \(error.localizedDescription)")
             }
@@ -139,9 +144,11 @@ class BezierStroke: Codable {
             ))
         }
         
-        // Set the stroke's transform and position.
-        stroke.setTransformMatrix(.identity, relativeTo: nil)
-        stroke.setPosition(center, relativeTo: nil)
+        if flag {
+            // Set the stroke's transform and position.
+            stroke.setTransformMatrix(.identity, relativeTo: nil)
+            stroke.setPosition(center, relativeTo: nil)
+        }
     }
     
     func updateMeshEnableFaceCulling() {
@@ -371,9 +378,11 @@ class BezierStroke: Codable {
     }
     
     enum CodingKeys: String, CodingKey {
+        case uuid
         case points
         case activeColor
         case maxRadius
+        case bezierPoints
     }
     
     // pointを変更しない
@@ -420,7 +429,8 @@ class BezierStroke: Codable {
         }
         
         self.maxRadius = try container.decodeIfPresent(Float.self, forKey: .maxRadius) ?? 1E-2
-        let uuid = UUID()
+        self.bezierPoints = try container.decodeIfPresent([BezierPoint].self, forKey: .bezierPoints) ?? []
+        let uuid = try container.decodeIfPresent(UUID.self, forKey: .uuid) ?? UUID()
         self.uuid = uuid
         self.tmpBezier = BezierPoint(strokeId: uuid)
         stroke.components.set(StrokeComponent(uuid))
@@ -430,6 +440,7 @@ class BezierStroke: Codable {
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(uuid, forKey: .uuid)
         let pointArrays = points.map { [$0.x, $0.y, $0.z] }
         try container.encode(pointArrays, forKey: .points)
         var hue: CGFloat = 0.0
@@ -439,6 +450,7 @@ class BezierStroke: Codable {
         activeColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
         try container.encode([hue, saturation, brightness, alpha], forKey: .activeColor)
         try container.encode(maxRadius, forKey: .maxRadius)
+        try container.encode(bezierPoints, forKey: .bezierPoints)
     }
 }
 

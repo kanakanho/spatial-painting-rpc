@@ -30,10 +30,18 @@ class PaintingCanvas {
     var tmpBoundingBoxEntity: Entity = Entity()
     var tmpBoundingBox: BoundingBoxCube = BoundingBoxCube()
     
+    // added by nagao 2025/11/21
+    var movingStrokes: [BezierStroke] = []
+
     var eraserEntity: Entity = Entity()
     var bezierEndPointEntity: Entity = Entity()
     var bezierHandleEntity: Entity = Entity()
-    
+
+    // added by nagao 2025/11/26
+    var selectedBezierEntity: Entity = Entity()
+    var isBezierSelected: Bool = false
+    var selectedBezierPosition: SIMD3<Float> = .zero
+
     // added by nagao 2025/7/10
     var boundingBoxEntity: ModelEntity = ModelEntity()
     
@@ -127,6 +135,22 @@ class PaintingCanvas {
         self.bezierHandleEntity = bezierHandleEntity
     }
     
+    // added by nagao 2025/11/26
+    func setSelectedBezierEntity(_ entity: Entity) {
+        selectedBezierEntity = entity
+        isBezierSelected = true
+        selectedBezierPosition = entity.position(relativeTo: nil)
+    }
+    
+    func setIsBezierSelected(_ isSelected: Bool) {
+        isBezierSelected = isSelected
+    }
+    
+    func setSelectedBezierPosition(_ position: SIMD3<Float>) {
+        //if isBezierSelected == false { return }
+        selectedBezierPosition = position
+    }
+
     /// Generate a point when the individual uses the drag gesture.
     func addPoint(_ strokeId: UUID, _ position: SIMD3<Float>, userId: UUID) {
         var individualStroke: IndividualStroke = individualStrokeDic[userId] ?? IndividualStroke()
@@ -286,6 +310,18 @@ class PaintingCanvas {
         }
     }
     
+    func setIsControlMode(_ isControlMode: Bool) {
+        if self.isControlMode == isControlMode {
+            return
+        }
+        self.isControlMode = isControlMode
+        if isControlMode {
+            startControlMode()
+        } else {
+            finishControlMode()
+        }
+    }
+
     func startControlMode() {
         for stroke in strokes {
             for bezierPoint in stroke.bezierPoints {
@@ -340,22 +376,29 @@ class PaintingCanvas {
         }
     }
     
-    func addStrokes(_ strokes: [BezierStroke]) {
+    func addBezierStrokes(_ strokes: [BezierStroke]) {
         for stroke in strokes {
-            addStroke(stroke)
+            addBezierStroke(stroke)
         }
     }
     
-    func addStroke(_ stroke: BezierStroke) {
+    func addBezierStroke(_ stroke: BezierStroke) {
         let newStroke = BezierStroke(uuid: stroke.uuid)
         newStroke.maxRadius = stroke.maxRadius
         newStroke.setActiveColor(color: stroke.activeColor)
-        newStroke.points = stroke.points
-        newStroke.bezierPoints = points2Beziers(strokeId: stroke.uuid, points: stroke.points, bezierEndPoint: bezierEndPointEntity.clone(recursive: true), bezierHandle: bezierHandleEntity.clone(recursive: true))
+//        newStroke.points = stroke.points
+        newStroke.bezierPoints = stroke.bezierPoints.map { point in
+            let newPoint: BezierStroke.BezierPoint = point
+            newPoint.setEntities(bezierEndPoint: bezierEndPointEntity.clone(recursive: true), bezierHandle: bezierHandleEntity.clone(recursive: true))
+            newPoint.remesh()
+            newPoint.root.isEnabled = false
+            return newPoint
+        }
         newStroke.updateMesh()
         for i in 0..<newStroke.bezierPoints.count {
             newStroke.root.addChild(newStroke.bezierPoints[i].root)
         }
+        gridPoints.addPoints(from: newStroke.bezierPoints)
         
         var count = 0
         for point in stroke.points {
@@ -386,6 +429,7 @@ class PaintingCanvas {
 extension PaintingCanvas {
     /// 一時的な Stroke をまとめて追加する modified by nagao 2015/7/10
     func addTmpStrokes(_ strokes: [BezierStroke]) {
+        if strokes.isEmpty { return }
         //print("load tmp strokes")
         for stroke in strokes {
             addTmpStroke(stroke)
@@ -397,10 +441,11 @@ extension PaintingCanvas {
         generateInputTargetEntity()
         
         for stroke in tmpStrokes {
-            stroke.points = stroke.points.map { (position:  SIMD3<Float>) in
+            stroke.points = stroke.points.map { (position: SIMD3<Float>) in
                 // entityのローカル座標に変換する
                 return stroke.root.convert(position: position, from: nil)
             }
+            stroke.bezierPoints = points2Beziers(strokeId: stroke.uuid, points: stroke.points, bezierEndPoint: bezierEndPointEntity.clone(recursive: true), bezierHandle: bezierHandleEntity.clone(recursive: true))
             stroke.root.setPosition(stroke.root.position - boundingBoxCenter, relativeTo: nil)
             boundingBoxEntity.addChild(stroke.root)
         }
@@ -435,6 +480,7 @@ extension PaintingCanvas {
         newStroke.maxRadius = stroke.maxRadius
         newStroke.setActiveColor(color: stroke.activeColor)
         newStroke.points = stroke.points
+        newStroke.bezierPoints = points2Beziers(strokeId: stroke.uuid, points: stroke.points, bezierEndPoint: bezierEndPointEntity.clone(recursive: true), bezierHandle: bezierHandleEntity.clone(recursive: true))
         newStroke.updateMesh()
         self.tmpStrokes.append(newStroke)
     }
@@ -442,16 +488,19 @@ extension PaintingCanvas {
     /// 追加処理の完了 modified by nagao 2015/7/10
     func confirmTmpStrokes() {
         if tmpStrokes.isEmpty { return }
+        var newStrokes: [BezierStroke] = []
         for stroke in tmpStrokes {
             stroke.points = stroke.points.map { (position: SIMD3<Float>) in
                 return SIMD3<Float>(stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(position, 1.0))
             }
-            let newStroke = BezierStroke(uuid: stroke.uuid, originalMaxRadius: stroke.originalMaxRadius)
+            let uuid: UUID = UUID() // added by nagao 2025/11/21
+            let newStroke = BezierStroke(uuid: uuid, originalMaxRadius: stroke.originalMaxRadius)
             newStroke.maxRadius = stroke.maxRadius
             newStroke.setActiveColor(color: stroke.activeColor)
             newStroke.points = stroke.points
-            newStroke.bezierPoints = points2Beziers(strokeId: stroke.uuid, points: stroke.points, bezierEndPoint: bezierEndPointEntity.clone(recursive: true), bezierHandle: bezierHandleEntity.clone(recursive: true))
+            newStroke.bezierPoints = points2Beziers(strokeId: uuid, points: stroke.points, bezierEndPoint: bezierEndPointEntity.clone(recursive: true), bezierHandle: bezierHandleEntity.clone(recursive: true))
             newStroke.updateMesh()
+
             for i in 0..<newStroke.bezierPoints.count {
                 newStroke.root.addChild(newStroke.bezierPoints[i].root)
             }
@@ -471,20 +520,21 @@ extension PaintingCanvas {
                     var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
                     invisibleMaterial.opacityThreshold = 1.0
                     entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
-                    entity.components.set(StrokeRootComponent(stroke.uuid))
+                    entity.components.set(StrokeRootComponent(uuid))
                     entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
                     entity.position = point
                     root.addChild(entity)
                 }
                 count += 1
             }
+            newStrokes.append(newStroke)
         }
         
         // root から tmpStrokes のエンティティを削除
-        boundingBoxEntity.children.removeAll()
-        tmpStrokes.removeAll()
-        boundingBoxEntity.removeFromParent()
-        boundingBoxEntity.transform.matrix = .identity
+        //boundingBoxEntity.children.removeAll()
+        tmpStrokes = newStrokes
+        //boundingBoxEntity.removeFromParent()
+        //boundingBoxEntity.transform.matrix = .identity
     }
     
     /// 一時的なストロークをクリアする（追加処理の停止）
@@ -495,6 +545,52 @@ extension PaintingCanvas {
         boundingBoxEntity.transform.matrix = .identity
     }
     
+    // added by nagao 2025/11/21
+    func addMovingStrokes(_ stroke: BezierStroke) {
+        movingStrokes.append(stroke)
+    }
+    func clearMovingStrokes() {
+        movingStrokes.removeAll()
+    }
+    func confirmMovingStrokes() -> Bool {
+        if movingStrokes.isEmpty { return false }
+        confirmTmpStrokes()
+        movingStrokes.removeAll()
+        return true
+    }
+    func changeColorOfMovingStrokes(_ color: UIColor ) {
+        if movingStrokes.isEmpty { return }
+        //var points: [SIMD3<Float>] = []
+        for stroke in tmpStrokes {
+            stroke.setActiveColor(color: color)
+            /*
+            points.append(contentsOf: stroke.points)
+            stroke.points = stroke.points.map { (position: SIMD3<Float>) in
+                return SIMD3<Float>(stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(position, 1.0))
+            }
+            */
+            stroke.updateMesh(false)
+            //stroke.points = points
+            //points.removeAll()
+        }
+    }
+    func changeLineWidthOfMovingStrokes(_ lineWidth: Float ) {
+        if movingStrokes.isEmpty { return }
+        //var points: [SIMD3<Float>] = []
+        for stroke in tmpStrokes {
+            stroke.maxRadius = lineWidth
+            /*
+            points.append(contentsOf: stroke.points)
+            stroke.points = stroke.points.map { (position: SIMD3<Float>) in
+                return SIMD3<Float>(stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(position, 1.0))
+            }
+            */
+            stroke.updateMesh(false)
+            //stroke.points = points
+            //points.removeAll()
+        }
+    }
+
     struct BoundingBoxCube {
         /// 頂点の位置を示す列挙型
         enum Corner: Int, CaseIterable {

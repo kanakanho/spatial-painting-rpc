@@ -89,6 +89,12 @@ class AdvancedColorPalletModel {
     var player2: AVAudioPlayer?
     var isSoundEnabled2: Bool = false
     
+    var player3: AVAudioPlayer?
+    var isSoundEnabled3: Bool = false
+    
+    var player4: AVAudioPlayer?
+    var isSoundEnabled4: Bool = false
+    
     let radius: Float = 0.08
     let centerHeight: Float = 0.12
     
@@ -185,7 +191,8 @@ class AdvancedColorPalletModel {
     func setSceneEntity(scene: Entity) {
         sceneEntity = scene
         isSoundEnabled = loadSound()
-        isSoundEnabled2 = loadSound2()
+        isSoundEnabled3 = loadSound3()
+        isSoundEnabled4 = loadSound4()
         
         if let entity = sceneEntity?.findEntity(named: "BasicColors") {
             let basicBalls = colorBalls.filter { $0.isBasic }
@@ -281,78 +288,38 @@ class AdvancedColorPalletModel {
         return UIColor(cgColor: converted)
     }
     
-    func updatePosition(position: SIMD3<Float>, wristPosition: SIMD3<Float>) {
-        // 1) 手から手首への水平ベクトル
-        let toWrist = normalize(simd_make_float3(
-            wristPosition.x - position.x,
-            0,
-            wristPosition.z - position.z
-        ))
-        
-        // 2) 符号付きヨー角 (rad)：右手系で y 軸回り
-        let dx = toWrist.x
-        let dz = toWrist.z
-        let yaw = atan2(dx, dz)
-        
-        var grayscalePosition: SIMD3<Float> = localOrigin
-        var toolPosition: SIMD3<Float> = localOrigin
-        
-        let basicBalls = colorBalls.filter { $0.isBasic }
-        for (index, colorBall) in zip(basicBalls.indices, basicBalls) {
-            let entity: Entity = colorEntityDictionary[colorBall.id]!
-            
-            // 回転後オフセット
-            let xRot: Float = colorBall.position.x * cos(yaw) - colorBall.position.z * sin(yaw)
-            let zRot: Float = colorBall.position.x * sin(yaw) + colorBall.position.z * cos(yaw)
-            let yPos: Float = colorBall.position.y + centerHeight
-            
-            let rotatedOffset = SIMD3<Float>(xRot, yPos, zRot)
-            
-            let newPosition: SIMD3<Float> = position + rotatedOffset
-            entity.setPosition(newPosition, relativeTo: nil)
-            
-            if index == 0 {
-                grayscalePosition += newPosition
-            } else if index == basicBalls.count - 1 {
-                toolPosition += newPosition
-            }
-        }
-        
-        let grayscaleBalls = colorBalls.filter { !$0.isBasic }
-        for colorBall in grayscaleBalls {
-            let entity: Entity = colorEntityDictionary[colorBall.id]!
-            entity.setPosition(grayscalePosition + colorBall.position, relativeTo: nil)
-        }
-        
-        for toolBall in toolBalls {
-            let entity: Entity = toolEntityDictionary[toolBall.id]!
-            entity.setPosition(toolPosition + toolBall.position, relativeTo: nil)
-        }
-    }
-    
-    func updatePosition2(position: SIMD3<Float>, unitVector: SIMD3<Float>) {
+    func updatePosition(position: SIMD3<Float>, unitVector: SIMD3<Float>, distVector: SIMD3<Float>) {
         var grayscalePosition: SIMD3<Float> = localOrigin
         var toolPosition: SIMD3<Float> = localOrigin
         let colorPosition: SIMD3<Float> = localOrigin + position
         
         let basicBalls = colorBalls.filter { $0.isBasic }
+        
+        let unitVector2 = projectOntoPlane(vector: unitVector, normalVector: SIMD3<Float>(0,1,0))
+        let distVector2 = projectOntoPlane(vector: distVector, normalVector: SIMD3<Float>(0,1,0))
+        
+        // オフセット
+        let xOff: Float = 0
+        let zOff: Float = 0
+        let yOff: Float = centerHeight
+        
+        let offset = SIMD3<Float>(xOff, yOff, zOff)
+        
         for (index, colorBall) in zip(basicBalls.indices, basicBalls) {
             let entity: Entity = colorEntityDictionary[colorBall.id]!
             
-            // オフセット
-            let xOff: Float = 0
-            let zOff: Float = 0
-            let yOff: Float = centerHeight
-            
-            let offset = SIMD3<Float>(xOff, yOff, zOff)
-            
-            let newPosition: SIMD3<Float> = calculateExtendedPoint(point: position + offset, vector: unitVector, distance: colorBall.position.x)
-            entity.setPosition(newPosition, relativeTo: nil)
-            
-            if index == 0 {
-                grayscalePosition += newPosition
-            } else if index == basicBalls.count - 1 {
-                toolPosition += newPosition
+            let newPosition: SIMD3<Float> = calculateExtendedPoint(point: position + offset, vector: unitVector2, distance: colorBall.position.x)
+            if colorBall.position.x > 0 {
+                entity.setPosition(newPosition, relativeTo: nil)
+                if index == basicBalls.count - 1 {
+                    toolPosition += newPosition
+                }
+            } else {
+                let newPosition2: SIMD3<Float> = calculateExtendedPoint(point: newPosition, vector: distVector2, distance: colorBall.position.x / 1.5)
+                entity.setPosition(newPosition2, relativeTo: nil)
+                if index == 0 {
+                    grayscalePosition += newPosition2
+                }
             }
             
             if colorBall.id == selectedBasicColorName {
@@ -360,12 +327,15 @@ class AdvancedColorPalletModel {
                 let subColorBalls = colorBalls.filterByID(containing: String(colorBall.id.prefix(1)), isBasic: false)
                 for cb in subColorBalls {
                     if let entity2: Entity = colorEntityDictionary[cb.id] {
-                        let newPosition2: SIMD3<Float> = calculateExtendedPoint(point: colorPosition + SIMD3<Float>(0, cb.position.y + yOff, 0), vector: unitVector, distance: cb.position.x)
-                        entity2.setPosition(newPosition2, relativeTo: nil)
-                        //print("Sub color ball \(cb.id) local position \(cb.position) new position \(newPosition2)")
+                        let newPosition3: SIMD3<Float> = calculateExtendedPoint(point: colorPosition + SIMD3<Float>(0, cb.position.y + yOff, 0), vector: unitVector2, distance: cb.position.x)
+                        if cb.position.x > 0 {
+                            entity2.setPosition(newPosition3, relativeTo: nil)
+                        } else {
+                            let newPosition4: SIMD3<Float> = calculateExtendedPoint(point: newPosition3, vector: distVector2, distance: cb.position.x / 1.5)
+                            entity2.setPosition(newPosition4, relativeTo: nil)
+                        }
                     }
                 }
-                //colorPalletEntity.addChild(colorPanelEntityDictionary[colorBall.id]!)
             }
         }
         
@@ -392,6 +362,17 @@ class AdvancedColorPalletModel {
         let extendedPoint = SIMD3<Float>(x: point.x + extensionVector.x, y: point.y + extensionVector.y, z: point.z + extensionVector.z)
         
         return extendedPoint
+    }
+    
+    // あるベクトルを、別のベクトルが法線ベクトルとなる平面に射影したベクトルを計算する関数
+    func projectOntoPlane(vector: SIMD3<Float>, normalVector: SIMD3<Float>, epsilon: Float = 1e-8) -> SIMD3<Float> {
+        let denom = simd_length_squared(normalVector)
+        if denom < epsilon {
+            // 法線がゼロに近い場合は平面が定義できないため、そのまま返す（または適宜エラー処理）
+            return vector
+        }
+        let t = simd_dot(vector, normalVector) / denom
+        return vector - t * normalVector
     }
     
     func initEntity() {
@@ -460,11 +441,11 @@ class AdvancedColorPalletModel {
         }
     }
     
-    func loadSound2() -> Bool {
-        guard let soundURL = Bundle.main.url(forResource: "shutter", withExtension: "mp3") else { return false }
+    func loadSound3() -> Bool {
+        guard let soundURL = Bundle.main.url(forResource: "bezierPoint", withExtension: "mp3") else { return false }
         
         do {
-            player2 = try AVAudioPlayer(contentsOf: soundURL)
+            player3 = try AVAudioPlayer(contentsOf: soundURL)
             return true
         } catch {
             print("音声ファイルの読み込みに失敗しました")
@@ -472,9 +453,27 @@ class AdvancedColorPalletModel {
         }
     }
     
-    func playShutterSound() {
-        if isSoundEnabled2 {
-            player2?.play()
+    func loadSound4() -> Bool {
+        guard let soundURL = Bundle.main.url(forResource: "bezierHandle", withExtension: "mp3") else { return false }
+        
+        do {
+            player4 = try AVAudioPlayer(contentsOf: soundURL)
+            return true
+        } catch {
+            print("音声ファイルの読み込みに失敗しました")
+            return false
+        }
+    }
+    
+    func playBezierPointSound() {
+        if isSoundEnabled3 {
+            player3?.play()
+        }
+    }
+    
+    func playBezierHandleSound() {
+        if isSoundEnabled4 {
+            player4?.play()
         }
     }
 }

@@ -53,11 +53,22 @@ class ViewModel {
         var right: HandAnchor?
     }
     
+    // added by nagao 2015/11/20
+    enum AuthoringMode {
+        case draw
+        case edit
+        case bezier
+    }
+    var authoringMode: AuthoringMode = .draw
+
     // ストロークを消去する時の長押し時間 added by nagao 2025/3/24
     var clearTime: Int = 0
     
     // ストロークを選択的に消去するモード added by nagao 2025/6/20
     var isEraserMode: Bool = false
+    
+    // ストロークを選択するモード added by nagao 2025/11/21
+    var isSelectorMode: Bool = false
     
     // added by nagao 2025/6/18
     var handSphereEntity: Entity? = nil
@@ -76,6 +87,11 @@ class ViewModel {
     
     var buttonPlateEntity: Entity = Entity()
     
+    // added by nagao 2025/11/20
+    var drawModeEntity: Entity = Entity()
+    var editModeEntity: Entity = Entity()
+    var bezierModeEntity: Entity = Entity()
+
     var axisVectors: [SIMD3<Float>] = [SIMD3<Float>(0,0,0), SIMD3<Float>(0,0,0), SIMD3<Float>(0,0,0)]
     
     var normalVector: SIMD3<Float> = SIMD3<Float>(0,0,0)
@@ -118,6 +134,13 @@ class ViewModel {
         }
     }
     
+    // added by nagao 2025/11/20
+    func setModeEntities(drawModeEntity: Entity, editModeEntity: Entity, bezierModeEntity: Entity) {
+        self.drawModeEntity = drawModeEntity
+        self.editModeEntity = editModeEntity
+        self.bezierModeEntity = bezierModeEntity
+    }
+
     func showHandArrowEntities() {
         if handSphereEntity != nil {
             contentEntity.addChild(handSphereEntity!)
@@ -140,7 +163,7 @@ class ViewModel {
         }
     }
     
-    func dismissHandArrowEntities() {
+    func dismissEntities() {
         if handSphereEntity != nil {
             handSphereEntity!.removeFromParent()
             if handArrowEntities.count > 0 {
@@ -154,6 +177,9 @@ class ViewModel {
         colorPalletModel.colorPalletEntityDisable()
         
         buttonPlateEntity.removeFromParent()
+        drawModeEntity.removeFromParent()
+        editModeEntity.removeFromParent()
+        bezierModeEntity.removeFromParent()
     }
     
     let fingerEntities: [HandAnchor.Chirality: ModelEntity] = [/*.left: .createFingertip(name: "L", color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 1.0)),*/ .right: .createFingertip(name: "R", color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 1.0))]
@@ -208,17 +234,16 @@ class ViewModel {
     
     // modified by nagao 2025/7/17
     func changeFingerColor(entity: Entity, colorName: String) {
-        //print("Finger color changed to: \(colorName)")
-        if colorPalletModel.selectedBasicColorName == colorName {
-            return
-        }
         let colorBall = colorPalletModel.colorBalls.get(withID: colorName)
         if colorBall == nil {
             return
         }
         let prev = colorPalletModel.selectedBasicColorName
         if prev != "" {
-            if colorBall!.isBasic || colorName.hasPrefix("m") {
+            if colorBall!.isBasic /*|| colorName.hasPrefix("m")*/ {
+                if prev == colorName {
+                    return
+                }
                 if let prevEntity = colorPalletModel.colorEntityDictionary[prev] {
                     prevEntity.setScale(SIMD3<Float>(repeating: 0.01), relativeTo: nil)
                     let colorBall2 = colorPalletModel.colorBalls.get(withID: prev)
@@ -236,6 +261,10 @@ class ViewModel {
             }
         }
         if let color: UIColor = colorPalletModel.colorDictionary[colorName] {
+            if color == colorPalletModel.activeColor {
+                return
+            }
+            colorPalletModel.setActiveColor(color: color)
             let material = SimpleMaterial(color: color, isMetallic: false)
             entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [material]))
             if let colorEntity = colorPalletModel.colorEntityDictionary[colorName] {
@@ -267,7 +296,24 @@ class ViewModel {
         }
         colorPalletModel.selectedToolName = toolName
     }
-    
+
+    // added by nagao 2025/11/21
+    func getColor(colorName: String) -> UIColor {
+        if let color: UIColor = colorPalletModel.colorDictionary[colorName] {
+            return color
+        } else {
+            return .black
+        }
+    }
+    func getLineWidth(toolName: String) -> Float {
+        let toolBall = colorPalletModel.toolBalls.get(withID: toolName)
+        if toolBall != nil {
+            return Float(toolBall!.lineWidth)
+        } else {
+            return 1E-2
+        }
+    }
+
     // added by nagao 2025/7/17
     func resetColor() {
         if colorPalletModel.selectedBasicColorName == "" {
@@ -447,8 +493,45 @@ class ViewModel {
             if !isButtonExist {
                 contentEntity.addChild(buttonPlateEntity)
             }
+            let unitVector2 = projectOntoPlane(vector: unitVector, normalVector: SIMD3<Float>(0,1,0))
+            let point2 = calculateExtendedPoint(point: planePoint, vector: normalVector, distance: 0.15)
+            let point3 = calculateExtendedPoint(point: point2, vector: unitVector2, distance: 0.08)
+            let point4 = calculateExtendedPoint(point: point2, vector: unitVector2, distance: -0.08)
+            var drawScale: Float = 2.0
+            var editScale: Float = 2.0
+            var bezierScale: Float = 2.0
+            switch authoringMode {
+            case .draw:
+                drawScale = 2.5
+            case .edit:
+                editScale = 2.5
+            case .bezier:
+                bezierScale = 2.5
+            }
+            let matrix2 = makeBoxTransformMatrix(center: point2, longAxis: planeNormalVector, size: SIMD3<Float>(editScale, editScale, editScale))
+            let matrix3 = makeBoxTransformMatrix(center: point3, longAxis: planeNormalVector, size: SIMD3<Float>(drawScale, drawScale, drawScale))
+            let matrix4 = makeBoxTransformMatrix(center: point4, longAxis: planeNormalVector, size: SIMD3<Float>(bezierScale, bezierScale, bezierScale))
+
+            drawModeEntity.setTransformMatrix(matrix3, relativeTo: nil)
+            let isDrawModeExist = contentEntity.children.contains { $0 === drawModeEntity }
+            if !isDrawModeExist {
+                contentEntity.addChild(drawModeEntity)
+            }
+            editModeEntity.setTransformMatrix(matrix2, relativeTo: nil)
+            let isEditModeExist = contentEntity.children.contains { $0 === editModeEntity }
+            if !isEditModeExist {
+                contentEntity.addChild(editModeEntity)
+            }
+            bezierModeEntity.setTransformMatrix(matrix4, relativeTo: nil)
+            let isBezierModeExist = contentEntity.children.contains { $0 === bezierModeEntity }
+            if !isBezierModeExist {
+                contentEntity.addChild(bezierModeEntity)
+            }
         } else {
             buttonPlateEntity.removeFromParent()
+            drawModeEntity.removeFromParent()
+            editModeEntity.removeFromParent()
+            bezierModeEntity.removeFromParent()
         }
         
         // ワールドの下方向ベクトル
@@ -473,9 +556,7 @@ class ViewModel {
             colorPalletModel.colorPalletEntityEnabled()
         }
         
-        //        colorPalletModel.updatePosition(position: positionMatrix.position, wristPosition: wristPos)
-        colorPalletModel.updatePosition2(position: positionMatrix.position, unitVector: unitVector)
-        
+        colorPalletModel.updatePosition(position: positionMatrix.position, unitVector: unitVector, distVector: planeNormalVector)
     }
     
     func createHandSphere(wrist: SIMD3<Float>, middle: SIMD3<Float>, little: SIMD3<Float>, isArrowShown: Bool) {
@@ -711,6 +792,17 @@ class ViewModel {
         return extendedPoint
     }
     
+    // あるベクトルを、別のベクトルが法線ベクトルとなる平面に射影したベクトルを計算する関数
+    func projectOntoPlane(vector: SIMD3<Float>, normalVector: SIMD3<Float>, epsilon: Float = 1e-8) -> SIMD3<Float> {
+        let denom = simd_length_squared(normalVector)
+        if denom < epsilon {
+            // 法線がゼロに近い場合は平面が定義できないため、そのまま返す（または適宜エラー処理）
+            return vector
+        }
+        let t = simd_dot(vector, normalVector) / denom
+        return vector - t * normalVector
+    }
+
     // ストロークを消去する時の長押し時間の処理 added by nagao 2025/3/24
     func recordTime(isBegan: Bool) -> Bool {
         if isBegan {
@@ -801,8 +893,8 @@ class ViewModel {
         initBallEntity.addChild(xStroke)
     }
     
-    func initColorPalletNodel(colorPalletModel: AdvancedColorPalletModel) {
-        print("initColorPalletNodel")
+    func initColorPalletModel(colorPalletModel: AdvancedColorPalletModel) {
+        //print("initColorPalletModel")
         self.colorPalletModel = colorPalletModel
     }
     

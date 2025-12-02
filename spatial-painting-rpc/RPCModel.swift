@@ -275,7 +275,7 @@ class RPCModel: ObservableObject {
         case (.paintingEntity(.addBezierStrokePoints),.paintingEntity(.addBezierStrokePoints(_))):
             // 自身に対して追加操作を行わない
             break
-        case (.paintingEntity(.addStrokes),.paintingEntity(.addStrokes(_))):
+        case (.paintingEntity(.addBezierStrokes),.paintingEntity(.addBezierStrokes(_))):
             // 自身に対して追加操作を行わない
             break
         case let
@@ -317,8 +317,8 @@ class RPCModel: ObservableObject {
             painting.addBezierStrokePoints(param: p)
         case let (.paintingEntity(.finishStroke),.paintingEntity(.finishStroke(p))):
             painting.finishStroke(param: p)
-        case let (.paintingEntity(.addStrokes),.paintingEntity(.addStrokes(p))):
-            painting.addStrokes(param: p)
+        case let (.paintingEntity(.addBezierStrokes),.paintingEntity(.addBezierStrokes(p))):
+            painting.addBezierStrokes(param: p)
         case let
             (.paintingEntity(.setStrokeColor),.paintingEntity(.setStrokeColor(p))):
             painting.setStrokeColor(param: p)
