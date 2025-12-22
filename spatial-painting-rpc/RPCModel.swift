@@ -234,6 +234,13 @@ class RPCModel: ObservableObject {
     @Published var painting = Painting()
     
     /// 再送処理から除外するメソッドかどうかを判定
+    /// 
+    /// 高頻度で呼び出されるメソッドは、パフォーマンスとネットワーク効率のため
+    /// 再送処理の対象から除外されます。これらのメソッドは：
+    /// - キューに追加されません
+    /// - acknowledgment を送信しません
+    /// - タイムアウトによる再送が行われません
+    /// 
     /// - Parameter method: チェックするメソッド
     /// - Returns: 除外する場合はtrue
     private func shouldExcludeFromRetry(_ method: Method) -> Bool {
