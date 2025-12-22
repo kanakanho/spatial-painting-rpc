@@ -22,12 +22,6 @@ struct QueuedRequest {
 /// Thread-safe queue for managing pending RPC requests with retry logic
 @MainActor
 class RequestQueue: ObservableObject {
-    /// Default timeout in seconds before retrying a request
-    static let defaultTimeout: TimeInterval = 5.0
-    
-    /// Default maximum retry attempts
-    static let defaultMaxRetries: Int = 3
-    
     /// Dictionary of pending requests keyed by request ID
     private var pendingRequests: [UUID: QueuedRequest] = [:]
     
@@ -43,14 +37,15 @@ class RequestQueue: ObservableObject {
     /// Callback for retrying requests
     var onRetry: ((RequestSchema) -> Void)?
     
-    init(timeout: TimeInterval = defaultTimeout, maxRetries: Int = defaultMaxRetries) {
+    init(timeout: TimeInterval = 5.0, maxRetries: Int = 3) {
         self.timeout = timeout
         self.maxRetries = maxRetries
         startRetryTimer()
     }
     
     deinit {
-        stopRetryTimer()
+        retryTimer?.invalidate()
+        retryTimer = nil
     }
     
     /// Add a request to the queue

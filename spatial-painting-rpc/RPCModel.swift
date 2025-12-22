@@ -134,6 +134,20 @@ struct RequestSchema: Codable {
         self.param = .paintingEntity(param)
     }
     
+    init(id: UUID, peerId: Int, method: AcknowledgmentEntity.Method, param: AcknowledgmentEntity.Param) {
+        self.id = id
+        self.peerId = peerId
+        self.method = .acknowledgment(method)
+        self.param = .acknowledgment(param)
+    }
+    
+    init(peerId: Int, method: AcknowledgmentEntity.Method, param: AcknowledgmentEntity.Param) {
+        self.id = UUID()
+        self.peerId = peerId
+        self.method = .acknowledgment(method)
+        self.param = .acknowledgment(param)
+    }
+    
     /// カスタムエンコード
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -398,8 +412,8 @@ class RPCModel: ObservableObject {
     private func sendAcknowledgment(requestId: UUID, to peerId: Int) {
         let ackRequest = RequestSchema(
             peerId: mcPeerIDUUIDWrapper.mine.hash,
-            method: .acknowledgment(.ack),
-            param: .acknowledgment(.ack(AckParam(requestId: requestId)))
+            method: .ack,
+            param: .ack(AckParam(requestId: requestId))
         )
         
         guard let requestData = try? jsonEncoder.encode(ackRequest) else {
