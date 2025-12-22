@@ -328,6 +328,30 @@ struct AckParam: Codable {
 }
 ```
 
+### 再送処理から除外されるメソッド
+
+パフォーマンスと効率性のため、以下の高頻度メソッドは再送処理の対象外です：
+
+- `addStrokePoint`: ストロークポイントの追加（高頻度で発生）
+- `addBezierStrokePoints`: ベジェストロークポイントの追加（高頻度で発生）
+
+これらのメソッドは：
+- キューに追加されません
+- acknowledgment を送信しません
+- タイムアウトによる再送が行われません
+
+```swift
+private func shouldExcludeFromRetry(_ method: Method) -> Bool {
+    switch method {
+    case .paintingEntity(.addStrokePoint),
+         .paintingEntity(.addBezierStrokePoints):
+        return true
+    default:
+        return false
+    }
+}
+```
+
 ### リトライフロー
 
 ```

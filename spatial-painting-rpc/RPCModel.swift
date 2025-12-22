@@ -233,6 +233,19 @@ class RPCModel: ObservableObject {
     @Published var coordinateTransforms = CoordinateTransforms()
     @Published var painting = Painting()
     
+    /// 再送処理から除外するメソッドかどうかを判定
+    /// - Parameter method: チェックするメソッド
+    /// - Returns: 除外する場合はtrue
+    private func shouldExcludeFromRetry(_ method: Method) -> Bool {
+        switch method {
+        case .paintingEntity(.addStrokePoint),
+             .paintingEntity(.addBezierStrokePoints):
+            return true
+        default:
+            return false
+        }
+    }
+    
     /// RPC の実行と RPC リクエストの送信
     ///
     /// - Note: このメソッドでは、全ての Peer と共通化して実行したいメソッドを呼び出します
@@ -274,8 +287,10 @@ class RPCModel: ObservableObject {
             return RPCResult("Failed to encode request")
         }
         
-        // リクエストをキューに追加
-        requestQueue.enqueue(request)
+        // リクエストをキューに追加（除外対象のメソッドは追加しない）
+        if !shouldExcludeFromRetry(request.method) {
+            requestQueue.enqueue(request)
+        }
         
         sendExchangeDataWrapper.setData(requestData)
         return rpcResult
@@ -325,8 +340,10 @@ class RPCModel: ObservableObject {
             return RPCResult("Failed to encode request")
         }
         
-        // リクエストをキューに追加
-        requestQueue.enqueue(request)
+        // リクエストをキューに追加（除外対象のメソッドは追加しない）
+        if !shouldExcludeFromRetry(request.method) {
+            requestQueue.enqueue(request)
+        }
         
         sendExchangeDataWrapper.setData(requestData, to: mcPeerId)
         return rpcResult
@@ -384,8 +401,10 @@ class RPCModel: ObservableObject {
             return error(message: rpcResult.errorMessage, to: request.peerId)
         }
         
-        // リクエストが成功したら acknowledgment を送信
-        sendAcknowledgment(requestId: request.id, to: request.peerId)
+        // リクエストが成功したら acknowledgment を送信（除外対象のメソッドは送信しない）
+        if !shouldExcludeFromRetry(request.method) {
+            sendAcknowledgment(requestId: request.id, to: request.peerId)
+        }
         
         return rpcResult
     }
