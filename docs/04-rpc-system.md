@@ -283,6 +283,156 @@ let result = rpcModel.sendRequest(request)  // ローカル実行 + 送信
 // 受信側では receiveRequest が自動実行
 ```
 
+## リトライ機構と信頼性
+
+### 概要
+RPCシステムには、通信の信頼性を向上させるための自動リトライ機構が組み込まれています。送信されたリクエストはキューで管理され、acknowledgment（ack）を受信するまで追跡されます。
+
+### RequestQueue
+リクエストの再送管理を担うクラスです。
+
+```swift
+@MainActor
+class RequestQueue: ObservableObject {
+    /// タイムアウト時間（デフォルト: 5秒）
+    static let defaultTimeout: TimeInterval = 5.0
+    
+    /// 最大リトライ回数（デフォルト: 3回）
+    static let defaultMaxRetries: Int = 3
+    
+    /// リクエストをキューに追加
+    func enqueue(_ request: RequestSchema)
+    
+    /// リクエストをキューから削除
+    func dequeue(_ requestId: UUID)
+    
+    /// リトライコールバック
+    var onRetry: ((RequestSchema) -> Void)?
+}
+```
+
+### AcknowledgmentEntity
+リクエストの成功を確認するためのエンティティです。
+
+#### メソッド定義
+```swift
+enum Method: RPCEntityMethod {
+    case ack
+}
+```
+
+#### パラメータ構造体
+```swift
+struct AckParam: Codable {
+    let requestId: UUID  // 確認するリクエストのID
+}
+```
+
+### 再送処理から除外されるメソッド
+
+パフォーマンスと効率性のため、以下の高頻度メソッドは再送処理の対象外です：
+
+- `addStrokePoint`: ストロークポイントの追加（高頻度で発生）
+- `addBezierStrokePoints`: ベジェストロークポイントの追加（高頻度で発生）
+
+これらのメソッドは：
+- キューに追加されません
+- acknowledgment を送信しません
+- タイムアウトによる再送が行われません
+
+```swift
+private func shouldExcludeFromRetry(_ method: Method) -> Bool {
+    switch method {
+    case .paintingEntity(.addStrokePoint),
+         .paintingEntity(.addBezierStrokePoints):
+        return true
+    default:
+        return false
+    }
+}
+```
+
+### リトライフロー
+
+```
+[リクエスト送信]
+      ↓
+[キューに追加] ← タイムスタンプ記録
+      ↓
+[ピアに送信]
+      ↓
+[ack受信待機] ← タイマーで監視
+      ↓
+   タイムアウト？
+      ↓
+  Yes / No
+   ↓     ↓
+[再送]  [キューから削除]
+```
+
+### 送信側の処理
+```swift
+func sendRequest(_ request: RequestSchema) -> RPCResult {
+    // ローカル実行
+    var rpcResult = RPCResult()
+    switch (request.method, request.param) {
+        // ... メソッド実行
+    }
+    
+    // リクエストを送信
+    guard let requestData = try? jsonEncoder.encode(request) else {
+        return RPCResult("Failed to encode request")
+    }
+    
+    // キューに追加（リトライ管理開始）
+    requestQueue.enqueue(request)
+    
+    sendExchangeDataWrapper.setData(requestData)
+    return rpcResult
+}
+```
+
+### 受信側の処理
+```swift
+func receiveRequest(_ request: RequestSchema) -> RPCResult {
+    // acknowledgment の処理
+    if case let (.acknowledgment(.ack), .acknowledgment(.ack(param))) = 
+        (request.method, request.param) {
+        // キューから削除
+        requestQueue.dequeue(param.requestId)
+        return RPCResult()
+    }
+    
+    // 通常のリクエスト処理
+    var rpcResult = RPCResult()
+    switch (request.method, request.param) {
+        // ... メソッド実行
+    }
+    
+    if !rpcResult.success {
+        return error(message: rpcResult.errorMessage, to: request.peerId)
+    }
+    
+    // 成功したら ack を送信
+    sendAcknowledgment(requestId: request.id, to: request.peerId)
+    
+    return rpcResult
+}
+```
+
+### リトライ動作
+
+1. **タイムアウト検出**: 1秒ごとにタイマーがキューをチェック
+2. **リトライ判定**: 5秒以上経過したリクエストを検出
+3. **再送実行**: リトライカウントが上限未満なら再送
+4. **最大リトライ**: 3回のリトライ後、キューから削除
+
+### 設定のカスタマイズ
+```swift
+// カスタムタイムアウトとリトライ回数
+let requestQueue = RequestQueue(timeout: 10.0, maxRetries: 5)
+```
+
 ## 拡張性
 
 ### 新しいエンティティの追加
@@ -294,4 +444,4 @@ let result = rpcModel.sendRequest(request)  // ローカル実行 + 送信
 ### カスタムエンコーディング
 各エンティティで独自のエンコーディングロジックを実装可能
 
-このRPCシステムにより、型安全で拡張可能な分散アプリケーションアーキテクチャを実現しています。
+このRPCシステムにより、型安全で拡張可能かつ信頼性の高い分散アプリケーションアーキテクチャを実現しています。
