@@ -37,7 +37,7 @@ class RequestQueue: ObservableObject {
     /// Callback for retrying requests
     var onRetry: ((RequestSchema) -> Void)?
     
-    init(timeout: TimeInterval = 5.0, maxRetries: Int = 3) {
+    init(timeout: TimeInterval = 1.0, maxRetries: Int = 3) {
         self.timeout = timeout
         self.maxRetries = maxRetries
         startRetryTimer()
@@ -57,11 +57,13 @@ class RequestQueue: ObservableObject {
             maxRetries: maxRetries
         )
         pendingRequests[request.id] = queuedRequest
+        print("Enqueued request \(request.id) for tracking")
     }
     
     /// Remove a request from the queue (called when ack is received)
     func dequeue(_ requestId: UUID) {
         pendingRequests.removeValue(forKey: requestId)
+        print("Dequeued request \(requestId) upon acknowledgment")
     }
     
     /// Check if a request is in the queue

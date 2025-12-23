@@ -25,7 +25,7 @@ struct RequestQueueTests {
         
         let request = RequestSchema(
             peerId: 1,
-            method: .error(.error),
+            method: .error,
             param: .error(ErrorParam(errorMessage: "test"))
         )
         
@@ -47,7 +47,7 @@ struct RequestQueueTests {
         for i in 0..<5 {
             let request = RequestSchema(
                 peerId: i,
-                method: .error(.error),
+                method: .error,
                 param: .error(ErrorParam(errorMessage: "test \(i)"))
             )
             queue.enqueue(request)
