@@ -11,6 +11,106 @@ import UIKit
 /// RPCModelのUndoRedo関連のヘルパーメソッド拡張
 @MainActor
 extension RPCModel {
+    /// ストロークの色変更アクションを記録して送信
+    /// - Parameters:
+    ///   - userId: ユーザーID
+    ///   - newColorName: 新しい色の名前
+    /// - Returns: RPCResult
+    func sendAndRecordColorChange(userId: UUID, newColorName: String) -> RPCResult {
+        let oldColorName = painting.getCurrentColorName()
+        
+        let request = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .paintingEntity(.setStrokeColor),
+            param: .paintingEntity(.setStrokeColor(SetStrokeColorParam(userId: userId, strokeColorName: newColorName)))
+        )
+        
+        // アクションを記録
+        recordColorChange(userId: userId, newColorName: newColorName, oldColorName: oldColorName)
+        
+        // リクエストを送信
+        return sendRequest(request)
+    }
+    
+    /// ストロークの削除アクションを記録して送信
+    /// - Parameters:
+    ///   - strokeId: 削除するストロークのID
+    /// - Returns: RPCResult
+    func sendAndRecordStrokeRemoval(strokeId: UUID) -> RPCResult {
+        // 削除前にストロークのデータを取得
+        guard let stroke = painting.paintingCanvas.getStroke(strokeId: strokeId) else {
+            return RPCResult("Stroke not found")
+        }
+        
+        let request = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .paintingEntity(.removeStroke),
+            param: .paintingEntity(.removeStroke(RemoveStrokeParam(uuid: strokeId)))
+        )
+        
+        // アクションを記録
+        recordStrokeRemoval(strokeId: strokeId)
+        
+        // リクエストを送信
+        return sendRequest(request)
+    }
+    
+    /// 全ストロークの削除アクションを記録して送信
+    /// - Returns: RPCResult
+    func sendAndRecordAllStrokesRemoval() -> RPCResult {
+        let request = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .paintingEntity(.removeAllStroke),
+            param: .paintingEntity(.removeAllStroke(PaintingEntity.Param.RemoveAllStrokeParam()))
+        )
+        
+        // アクションを記録
+        recordAllStrokesRemoval()
+        
+        // リクエストを送信
+        return sendRequest(request)
+    }
+    
+    /// ストロークの確定アクションを記録して送信
+    /// - Parameters:
+    ///   - userId: ユーザーID
+    ///   - strokeId: ストロークのID
+    /// - Returns: RPCResult
+    func sendAndRecordStrokeFinish(userId: UUID, strokeId: UUID) -> RPCResult {
+        let request = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .paintingEntity(.finishStroke),
+            param: .paintingEntity(.finishStroke(FinishStrokeParam(userId: userId)))
+        )
+        
+        // アクションを記録
+        recordStrokeFinish(userId: userId, strokeId: strokeId)
+        
+        // リクエストを送信
+        return sendRequest(request)
+    }
+    
+    /// 線幅の変更アクションを記録して送信
+    /// - Parameters:
+    ///   - userId: ユーザーID
+    ///   - newToolName: 新しいツール名
+    /// - Returns: RPCResult
+    func sendAndRecordLineWidthChange(userId: UUID, newToolName: String) -> RPCResult {
+        let oldToolName = painting.getCurrentToolName()
+        
+        let request = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .paintingEntity(.changeFingerLineWidth),
+            param: .paintingEntity(.changeFingerLineWidth(ChangeFingerLineWidthParam(userId: userId, toolName: newToolName)))
+        )
+        
+        // アクションを記録
+        recordLineWidthChange(userId: userId, newToolName: newToolName, oldToolName: oldToolName)
+        
+        // リクエストを送信
+        return sendRequest(request)
+    }
+    
     /// ストロークの色変更アクションを記録
     /// - Parameters:
     ///   - userId: ユーザーID
