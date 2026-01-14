@@ -81,6 +81,11 @@ class Painting:ObservableObject {
             controlPointId: param.controlPointId
         )
     }
+    
+    /// ストロークを再表示する（Undo用）
+    func restoreStroke(param: RestoreStrokeParam) {
+        paintingCanvas.addBezierStroke(param.stroke)
+    }
 }
 
 struct PaintingEntity: RPCEntity {
@@ -95,6 +100,7 @@ struct PaintingEntity: RPCEntity {
         case changeFingerLineWidth
         case moveControlPoint
         case finishControlPoint
+        case restoreStroke
     }
     
     enum Param: RPCEntityParam {
@@ -108,6 +114,7 @@ struct PaintingEntity: RPCEntity {
         case changeFingerLineWidth(ChangeFingerLineWidthParam)
         case moveControlPoint(MoveControlPointParam)
         case finishControlPoint(FinishControlPointParam)
+        case restoreStroke(RestoreStrokeParam)
         
         struct SetStrokeColorParam: Codable {
             let userId: UUID
@@ -157,6 +164,10 @@ struct PaintingEntity: RPCEntity {
             let controlPointId: UUID
         }
         
+        struct RestoreStrokeParam: Codable {
+            let stroke: BezierStroke
+        }
+        
         func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             switch self {
@@ -180,6 +191,8 @@ struct PaintingEntity: RPCEntity {
                 try container.encode(param, forKey: .moveControlPoint)
             case .finishControlPoint(let param):
                 try container.encode(param, forKey: .finishControlPoint)
+            case .restoreStroke(let param):
+                try container.encode(param, forKey: .restoreStroke)
             }
         }
         
@@ -205,6 +218,8 @@ struct PaintingEntity: RPCEntity {
                 self = .moveControlPoint(param)
             } else if let param = try? container.decode(FinishControlPointParam.self, forKey: .finishControlPoint) {
                 self = .finishControlPoint(param)
+            } else if let param = try? container.decode(RestoreStrokeParam.self, forKey: .restoreStroke) {
+                self = .restoreStroke(param)
             } else {
                 throw DecodingError.dataCorruptedError(forKey: CodingKeys.setStrokeColor, in: container, debugDescription: "Invalid parameter type")
             }
@@ -221,6 +236,7 @@ struct PaintingEntity: RPCEntity {
             case changeFingerLineWidth
             case moveControlPoint
             case finishControlPoint
+            case restoreStroke
         }
     }
 }
@@ -235,3 +251,4 @@ typealias FinishStrokeParam = PaintingEntity.Param.FinishStrokeParam
 typealias ChangeFingerLineWidthParam = PaintingEntity.Param.ChangeFingerLineWidthParam
 typealias MoveControlPointParam = PaintingEntity.Param.MoveControlPointParam
 typealias FinishControlPointParam = PaintingEntity.Param.FinishControlPointParam
+typealias RestoreStrokeParam = PaintingEntity.Param.RestoreStrokeParam

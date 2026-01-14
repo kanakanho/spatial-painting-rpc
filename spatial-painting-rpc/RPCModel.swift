@@ -187,6 +187,13 @@ class RPCModel: ObservableObject {
         self.sendExchangeDataWrapper = sendExchangeDataWrapper
         self.receiveExchangeDataWrapper = receiveExchangeDataWrapper
         self.mcPeerIDUUIDWrapper = mcPeerIDUUIDWrapper
+        
+        // UndoRedoManagerを初期化（デフォルトの除外メソッド設定付き）
+        self.undoRedoManager = UndoRedoManager(
+            maxSize: 100,
+            shouldExcludeMethod: UndoRedoManager.defaultPaintingMethodExclusionCheck
+        )
+        
         cancellable = receiveExchangeDataWrapper.$exchangeData.sink { [weak self] exchangeData in
             self?.receiveExchangeDataDidChange(exchangeData)
         }
@@ -203,6 +210,9 @@ class RPCModel: ObservableObject {
     
     @Published var coordinateTransforms = CoordinateTransforms()
     @Published var painting = Painting()
+    
+    /// Undo/Redoマネージャー
+    @Published var undoRedoManager: UndoRedoManager
     
     /// RPC の実行と RPC リクエストの送信
     ///
@@ -237,6 +247,8 @@ class RPCModel: ObservableObject {
             painting.changeFingerLineWidth(param: p)
         case let (.paintingEntity(.finishControlPoint), .paintingEntity(.finishControlPoint(p))):
             painting.finishControlPoint(param: p)
+        case let (.paintingEntity(.restoreStroke), .paintingEntity(.restoreStroke(p))):
+            painting.restoreStroke(param: p)
         default:
             return RPCResult("Invalid request")
         }
@@ -333,6 +345,8 @@ class RPCModel: ObservableObject {
             painting.moveControlPoint(param: p)
         case let (.paintingEntity(.finishControlPoint), .paintingEntity(.finishControlPoint(p))):
             painting.finishControlPoint(param: p)
+        case let (.paintingEntity(.restoreStroke), .paintingEntity(.restoreStroke(p))):
+            painting.restoreStroke(param: p)
         default:
             return RPCResult("Invalid request")
         }
@@ -355,5 +369,59 @@ class RPCModel: ObservableObject {
         }
         sendExchangeDataWrapper.setData(requestData, to: peerId)
         return RPCResult(message)
+    }
+    
+    /// Undo操作を実行
+    /// - Returns: 成功したかどうか
+    func performUndo() -> Bool {
+        guard let action = undoRedoManager.undo() else {
+            return false
+        }
+        
+        // Undoアクションを実行
+        let request = RequestSchema(
+            id: action.id,
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: action.undoMethod,
+            param: action.undoParam
+        )
+        
+        _ = sendRequest(request)
+        return true
+    }
+    
+    /// Redo操作を実行
+    /// - Returns: 成功したかどうか
+    func performRedo() -> Bool {
+        guard let action = undoRedoManager.redo() else {
+            return false
+        }
+        
+        // Redoアクションを実行
+        let request = RequestSchema(
+            id: action.id,
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: action.redoMethod,
+            param: action.redoParam
+        )
+        
+        _ = sendRequest(request)
+        return true
+    }
+    
+    /// アクションをUndoRedoManagerに記録（ヘルパーメソッド）
+    /// - Parameters:
+    ///   - redoMethod: Redoで実行するメソッド
+    ///   - redoParam: Redoで使用するパラメータ
+    ///   - undoMethod: Undoで実行するメソッド
+    ///   - undoParam: Undoで使用するパラメータ
+    func recordAction(redoMethod: Method, redoParam: Param, undoMethod: Method, undoParam: Param) {
+        let action = UndoRedoAction(
+            redoMethod: redoMethod,
+            redoParam: redoParam,
+            undoMethod: undoMethod,
+            undoParam: undoParam
+        )
+        undoRedoManager.addAction(action)
     }
 }
