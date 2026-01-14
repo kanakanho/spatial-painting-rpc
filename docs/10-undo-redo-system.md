@@ -137,8 +137,13 @@ struct UndoRedoAction {
 1. **addStrokePoint** - ストロークポイントの追加中
 2. **addBezierStrokePoints** - ベジェポイントの追加中
 3. **moveControlPoint** - 制御点の移動中
+4. **finishControlPoint** - 制御点の編集確定（完全なUndoが困難なため除外）
 
 この除外は`UndoRedoManager.defaultPaintingMethodExclusionCheck`メソッドで定義されています。
+
+**注意**: `finishControlPoint`は、一連の`moveControlPoint`操作の後に実行される確定操作です。
+完全なUndoを実現するには、編集開始前のストローク全体の状態を保存する必要があり、
+実装が複雑になるため、現在のバージョンでは除外されています。
 
 ## 使用例
 

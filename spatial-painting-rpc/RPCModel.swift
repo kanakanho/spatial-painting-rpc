@@ -249,6 +249,10 @@ class RPCModel: ObservableObject {
             painting.finishControlPoint(param: p)
         case let (.paintingEntity(.restoreStroke), .paintingEntity(.restoreStroke(p))):
             painting.restoreStroke(param: p)
+        case let (.paintingEntity(.restoreStrokes), .paintingEntity(.restoreStrokes(p))):
+            painting.restoreStrokes(param: p)
+        case let (.paintingEntity(.removeStrokes), .paintingEntity(.removeStrokes(p))):
+            painting.removeStrokes(param: p)
         default:
             return RPCResult("Invalid request")
         }
@@ -347,6 +351,10 @@ class RPCModel: ObservableObject {
             painting.finishControlPoint(param: p)
         case let (.paintingEntity(.restoreStroke), .paintingEntity(.restoreStroke(p))):
             painting.restoreStroke(param: p)
+        case let (.paintingEntity(.restoreStrokes), .paintingEntity(.restoreStrokes(p))):
+            painting.restoreStrokes(param: p)
+        case let (.paintingEntity(.removeStrokes), .paintingEntity(.removeStrokes(p))):
+            painting.removeStrokes(param: p)
         default:
             return RPCResult("Invalid request")
         }

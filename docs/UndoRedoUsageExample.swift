@@ -31,6 +31,7 @@ import SwiftUI
  - addStrokePoint (ストロークポイントの追加中)
  - addBezierStrokePoints (ベジェポイントの追加中)
  - moveControlPoint (制御点の移動中)
+ - finishControlPoint (制御点の編集確定) ※完全なUndoが困難なため除外
  
  ## 基本的な使用方法
  

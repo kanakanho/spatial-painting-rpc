@@ -78,9 +78,7 @@ class UndoRedoManager: ObservableObject {
         // キューの最大長を超えた場合、古いアクションを削除
         if actions.count > maxSize {
             actions.removeFirst()
-        } else {
-            // 削除しない場合のみインデックスをインクリメント
-            currentIndex += 1
+            // 削除した場合はcurrentIndexは変わらない（相対的に1つ前に戻る）
         }
         
         // currentIndexは常にactions.countと同じになる
@@ -127,6 +125,10 @@ extension UndoRedoManager {
             switch paintingMethod {
             case .addStrokePoint, .addBezierStrokePoints, .moveControlPoint:
                 // これらのメソッドは描画を確定させないため除外
+                return true
+            case .finishControlPoint:
+                // コントロールポイントの編集は複雑で、完全なUndoを実装するのが困難なため除外
+                // 将来的には編集開始時のストローク状態を保存する実装を追加することで対応可能
                 return true
             default:
                 return false

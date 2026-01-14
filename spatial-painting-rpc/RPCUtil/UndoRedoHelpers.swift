@@ -195,33 +195,29 @@ extension RPCModel {
         let redoMethod = Method.paintingEntity(.addBezierStrokes)
         let redoParam = Param.paintingEntity(.addBezierStrokes(AddBezierStrokesParam(strokes: strokes)))
         
-        // Undo時は各ストロークを個別に削除する必要があるが、
-        // 簡略化のため最初のストロークIDのみを使用（実際には全てのストロークを削除する処理が必要）
-        // より完全な実装では、複数のストロークを一度に削除するメソッドを追加する必要がある
-        if let firstStrokeId = strokeIds.first {
-            let undoMethod = Method.paintingEntity(.removeStroke)
-            let undoParam = Param.paintingEntity(.removeStroke(RemoveStrokeParam(uuid: firstStrokeId)))
-            
-            recordAction(redoMethod: redoMethod, redoParam: redoParam, undoMethod: undoMethod, undoParam: undoParam)
-        }
+        // Undo時は全てのストロークを削除
+        let undoMethod = Method.paintingEntity(.removeStrokes)
+        let undoParam = Param.paintingEntity(.removeStrokes(RemoveStrokesParam(uuids: strokeIds)))
+        
+        recordAction(redoMethod: redoMethod, redoParam: redoParam, undoMethod: undoMethod, undoParam: undoParam)
     }
     
     /// コントロールポイントの移動完了アクションを記録
     /// - Parameters:
     ///   - strokeId: ストロークID
     ///   - controlPointId: コントロールポイントID
-    ///   - newPosition: 新しい位置
-    ///   - oldPosition: 古い位置
-    ///   - controlType: コントロールポイントのタイプ
-    func recordControlPointFinish(strokeId: UUID, controlPointId: UUID, newPosition: SIMD3<Float>, oldPosition: SIMD3<Float>, controlType: BezierStroke.BezierPoint.PointType) {
-        let redoMethod = Method.paintingEntity(.finishControlPoint)
-        let redoParam = Param.paintingEntity(.finishControlPoint(FinishControlPointParam(strokeId: strokeId, controlPointId: controlPointId)))
-        
-        // Undo時は元の位置に戻して再度finishする
-        let undoMethod = Method.paintingEntity(.moveControlPoint)
-        let undoParam = Param.paintingEntity(.moveControlPoint(MoveControlPointParam(strokeId: strokeId, controlPointId: controlPointId, controlType: controlType, newPosition: oldPosition)))
-        
-        recordAction(redoMethod: redoMethod, redoParam: redoParam, undoMethod: undoMethod, undoParam: undoParam)
+    /// 
+    /// **注意**: この実装は簡略化されており、完全なUndo機能を提供しません。
+    /// コントロールポイントの編集操作は複雑で、一連のmoveControlPoint操作を
+    /// 経て最終的にfinishControlPointで確定されます。完全なUndoを実現するには、
+    /// 編集開始前のストローク全体の状態を保存する必要があります。
+    /// 
+    /// 現在の実装では、finishControlPointのUndoは記録されません。
+    /// より完全な実装が必要な場合は、編集開始時に元のストローク状態を保存し、
+    /// Undo時にストローク全体を復元する仕組みを追加してください。
+    func recordControlPointFinish(strokeId: UUID, controlPointId: UUID) {
+        // この操作は複雑なため、現在は記録をスキップ
+        // 将来的には、編集前のストローク全体を保存する実装を検討
     }
 }
 
