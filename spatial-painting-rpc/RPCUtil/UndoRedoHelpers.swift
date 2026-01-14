@@ -39,7 +39,7 @@ extension RPCModel {
     func sendAndRecordStrokeRemoval(strokeId: UUID) -> RPCResult {
         // 削除前にストロークのデータを取得
         guard let stroke = painting.paintingCanvas.getStroke(strokeId: strokeId) else {
-            return RPCResult("Stroke not found")
+            return RPCResult("Stroke with ID \(strokeId) not found")
         }
         
         let request = RequestSchema(
@@ -132,6 +132,7 @@ extension RPCModel {
     func recordStrokeRemoval(strokeId: UUID) {
         // 削除前にストロークのデータを取得
         guard let stroke = painting.paintingCanvas.getStroke(strokeId: strokeId) else {
+            print("Warning: Cannot record stroke removal - stroke with ID \(strokeId) not found")
             return
         }
         

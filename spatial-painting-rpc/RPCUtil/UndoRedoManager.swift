@@ -78,7 +78,9 @@ class UndoRedoManager: ObservableObject {
         // キューの最大長を超えた場合、古いアクションを削除
         if actions.count > maxSize {
             actions.removeFirst()
-            // 削除した場合はcurrentIndexは変わらない（相対的に1つ前に戻る）
+            // 削除すると全インデックスが1つずつ前にシフトするが、
+            // 最後にcurrentIndex = actions.countを設定するため、
+            // 相対的な位置関係は保たれる
         }
         
         // currentIndexは常にactions.countと同じになる
