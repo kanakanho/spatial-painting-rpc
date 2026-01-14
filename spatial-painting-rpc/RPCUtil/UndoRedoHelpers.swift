@@ -1,0 +1,240 @@
+//
+//  UndoRedoHelpers.swift
+//  spatial-painting-rpc
+//
+//  Created for undo/redo helper methods
+//
+
+import Foundation
+import UIKit
+
+/// RPCModelのUndoRedo関連のヘルパーメソッド拡張
+@MainActor
+extension RPCModel {
+    /// ストロークの色変更アクションを記録して送信
+    /// - Parameters:
+    ///   - userId: ユーザーID
+    ///   - newColorName: 新しい色の名前
+    /// - Returns: RPCResult
+    func sendAndRecordColorChange(userId: UUID, newColorName: String) -> RPCResult {
+        let oldColorName = painting.getCurrentColorName()
+        
+        let request = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .paintingEntity(.setStrokeColor),
+            param: .paintingEntity(.setStrokeColor(SetStrokeColorParam(userId: userId, strokeColorName: newColorName)))
+        )
+        
+        // アクションを記録
+        recordColorChange(userId: userId, newColorName: newColorName, oldColorName: oldColorName)
+        
+        // リクエストを送信
+        return sendRequest(request)
+    }
+    
+    /// ストロークの削除アクションを記録して送信
+    /// - Parameters:
+    ///   - strokeId: 削除するストロークのID
+    /// - Returns: RPCResult
+    func sendAndRecordStrokeRemoval(strokeId: UUID) -> RPCResult {
+        // 削除前にストロークのデータを取得
+        guard let stroke = painting.paintingCanvas.getStroke(strokeId: strokeId) else {
+            return RPCResult("Stroke with ID \(strokeId) not found")
+        }
+        
+        let request = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .paintingEntity(.removeStroke),
+            param: .paintingEntity(.removeStroke(RemoveStrokeParam(uuid: strokeId)))
+        )
+        
+        // アクションを記録
+        recordStrokeRemoval(strokeId: strokeId)
+        
+        // リクエストを送信
+        return sendRequest(request)
+    }
+    
+    /// 全ストロークの削除アクションを記録して送信
+    /// - Returns: RPCResult
+    func sendAndRecordAllStrokesRemoval() -> RPCResult {
+        let request = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .paintingEntity(.removeAllStroke),
+            param: .paintingEntity(.removeAllStroke(PaintingEntity.Param.RemoveAllStrokeParam()))
+        )
+        
+        // アクションを記録
+        recordAllStrokesRemoval()
+        
+        // リクエストを送信
+        return sendRequest(request)
+    }
+    
+    /// ストロークの確定アクションを記録して送信
+    /// - Parameters:
+    ///   - userId: ユーザーID
+    ///   - strokeId: ストロークのID
+    /// - Returns: RPCResult
+    func sendAndRecordStrokeFinish(userId: UUID, strokeId: UUID) -> RPCResult {
+        let request = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .paintingEntity(.finishStroke),
+            param: .paintingEntity(.finishStroke(FinishStrokeParam(userId: userId)))
+        )
+        
+        // アクションを記録
+        recordStrokeFinish(userId: userId, strokeId: strokeId)
+        
+        // リクエストを送信
+        return sendRequest(request)
+    }
+    
+    /// 線幅の変更アクションを記録して送信
+    /// - Parameters:
+    ///   - userId: ユーザーID
+    ///   - newToolName: 新しいツール名
+    /// - Returns: RPCResult
+    func sendAndRecordLineWidthChange(userId: UUID, newToolName: String) -> RPCResult {
+        let oldToolName = painting.getCurrentToolName()
+        
+        let request = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .paintingEntity(.changeFingerLineWidth),
+            param: .paintingEntity(.changeFingerLineWidth(ChangeFingerLineWidthParam(userId: userId, toolName: newToolName)))
+        )
+        
+        // アクションを記録
+        recordLineWidthChange(userId: userId, newToolName: newToolName, oldToolName: oldToolName)
+        
+        // リクエストを送信
+        return sendRequest(request)
+    }
+    
+    /// ストロークの色変更アクションを記録
+    /// - Parameters:
+    ///   - userId: ユーザーID
+    ///   - newColorName: 新しい色の名前
+    ///   - oldColorName: 古い色の名前
+    func recordColorChange(userId: UUID, newColorName: String, oldColorName: String) {
+        let redoMethod = Method.paintingEntity(.setStrokeColor)
+        let redoParam = Param.paintingEntity(.setStrokeColor(SetStrokeColorParam(userId: userId, strokeColorName: newColorName)))
+        
+        let undoMethod = Method.paintingEntity(.setStrokeColor)
+        let undoParam = Param.paintingEntity(.setStrokeColor(SetStrokeColorParam(userId: userId, strokeColorName: oldColorName)))
+        
+        recordAction(redoMethod: redoMethod, redoParam: redoParam, undoMethod: undoMethod, undoParam: undoParam)
+    }
+    
+    /// ストロークの削除アクションを記録
+    /// - Parameters:
+    ///   - strokeId: 削除するストロークのID
+    func recordStrokeRemoval(strokeId: UUID) {
+        // 削除前にストロークのデータを取得
+        guard let stroke = painting.paintingCanvas.getStroke(strokeId: strokeId) else {
+            print("Warning: Cannot record stroke removal - stroke with ID \(strokeId) not found")
+            return
+        }
+        
+        let redoMethod = Method.paintingEntity(.removeStroke)
+        let redoParam = Param.paintingEntity(.removeStroke(RemoveStrokeParam(uuid: strokeId)))
+        
+        let undoMethod = Method.paintingEntity(.restoreStroke)
+        let undoParam = Param.paintingEntity(.restoreStroke(RestoreStrokeParam(stroke: stroke)))
+        
+        recordAction(redoMethod: redoMethod, redoParam: redoParam, undoMethod: undoMethod, undoParam: undoParam)
+    }
+    
+    /// 全ストロークの削除アクションを記録
+    func recordAllStrokesRemoval() {
+        // 現在の全ストロークを保存
+        let allStrokes = painting.paintingCanvas.strokes
+        
+        let redoMethod = Method.paintingEntity(.removeAllStroke)
+        let redoParam = Param.paintingEntity(.removeAllStroke(PaintingEntity.Param.RemoveAllStrokeParam()))
+        
+        let undoMethod = Method.paintingEntity(.addBezierStrokes)
+        let undoParam = Param.paintingEntity(.addBezierStrokes(AddBezierStrokesParam(strokes: allStrokes)))
+        
+        recordAction(redoMethod: redoMethod, redoParam: redoParam, undoMethod: undoMethod, undoParam: undoParam)
+    }
+    
+    /// ストロークの確定アクションを記録
+    /// - Parameters:
+    ///   - userId: ユーザーID
+    ///   - strokeId: ストロークのID
+    func recordStrokeFinish(userId: UUID, strokeId: UUID) {
+        let redoMethod = Method.paintingEntity(.finishStroke)
+        let redoParam = Param.paintingEntity(.finishStroke(FinishStrokeParam(userId: userId)))
+        
+        let undoMethod = Method.paintingEntity(.removeStroke)
+        let undoParam = Param.paintingEntity(.removeStroke(RemoveStrokeParam(uuid: strokeId)))
+        
+        recordAction(redoMethod: redoMethod, redoParam: redoParam, undoMethod: undoMethod, undoParam: undoParam)
+    }
+    
+    /// 線幅の変更アクションを記録
+    /// - Parameters:
+    ///   - userId: ユーザーID
+    ///   - newToolName: 新しいツール名
+    ///   - oldToolName: 古いツール名
+    func recordLineWidthChange(userId: UUID, newToolName: String, oldToolName: String) {
+        let redoMethod = Method.paintingEntity(.changeFingerLineWidth)
+        let redoParam = Param.paintingEntity(.changeFingerLineWidth(ChangeFingerLineWidthParam(userId: userId, toolName: newToolName)))
+        
+        let undoMethod = Method.paintingEntity(.changeFingerLineWidth)
+        let undoParam = Param.paintingEntity(.changeFingerLineWidth(ChangeFingerLineWidthParam(userId: userId, toolName: oldToolName)))
+        
+        recordAction(redoMethod: redoMethod, redoParam: redoParam, undoMethod: undoMethod, undoParam: undoParam)
+    }
+    
+    /// ベジェストロークの追加アクションを記録
+    /// - Parameter strokes: 追加するストローク配列
+    func recordBezierStrokesAddition(strokes: [BezierStroke]) {
+        let strokeIds = strokes.map { $0.uuid }
+        
+        let redoMethod = Method.paintingEntity(.addBezierStrokes)
+        let redoParam = Param.paintingEntity(.addBezierStrokes(AddBezierStrokesParam(strokes: strokes)))
+        
+        // Undo時は全てのストロークを削除
+        let undoMethod = Method.paintingEntity(.removeStrokes)
+        let undoParam = Param.paintingEntity(.removeStrokes(RemoveStrokesParam(uuids: strokeIds)))
+        
+        recordAction(redoMethod: redoMethod, redoParam: redoParam, undoMethod: undoMethod, undoParam: undoParam)
+    }
+    
+    /// コントロールポイントの移動完了アクションを記録
+    /// - Parameters:
+    ///   - strokeId: ストロークID
+    ///   - controlPointId: コントロールポイントID
+    /// 
+    /// **注意**: この実装は簡略化されており、完全なUndo機能を提供しません。
+    /// コントロールポイントの編集操作は複雑で、一連のmoveControlPoint操作を
+    /// 経て最終的にfinishControlPointで確定されます。完全なUndoを実現するには、
+    /// 編集開始前のストローク全体の状態を保存する必要があります。
+    /// 
+    /// 現在の実装では、finishControlPointのUndoは記録されません。
+    /// より完全な実装が必要な場合は、編集開始時に元のストローク状態を保存し、
+    /// Undo時にストローク全体を復元する仕組みを追加してください。
+    func recordControlPointFinish(strokeId: UUID, controlPointId: UUID) {
+        // この操作は複雑なため、現在は記録をスキップ
+        // 将来的には、編集前のストローク全体を保存する実装を検討
+    }
+}
+
+/// Painting クラスへのUndoRedo関連のヘルパーメソッド拡張
+@MainActor
+extension Painting {
+    /// 現在選択されている色の名前を取得
+    /// - Returns: 色の名前、見つからない場合は "white"
+    func getCurrentColorName() -> String {
+        let currentColor = advancedColorPalletModel.selectedBasicColorName
+        return currentColor
+    }
+    
+    /// 現在選択されているツール名を取得
+    /// - Returns: ツール名
+    func getCurrentToolName() -> String {
+        return advancedColorPalletModel.selectedToolName
+    }
+}

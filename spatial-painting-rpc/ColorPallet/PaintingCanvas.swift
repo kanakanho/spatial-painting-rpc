@@ -591,6 +591,21 @@ extension PaintingCanvas {
         }
     }
 
+    /// ストロークを取得
+    func getStroke(strokeId: UUID) -> BezierStroke? {
+        return strokes.first { $0.uuid == strokeId }
+    }
+    
+    /// 現在のユーザーの色を取得
+    func getActiveColor(userId: UUID) -> SimpleMaterial.Color {
+        return individualStrokeDic[userId]?.activeColor ?? SimpleMaterial.Color.white
+    }
+    
+    /// 現在のユーザーの線幅を取得
+    func getMaxRadius(userId: UUID) -> Float {
+        return individualStrokeDic[userId]?.maxRadius ?? 1E-2
+    }
+    
     struct BoundingBoxCube {
         /// 頂点の位置を示す列挙型
         enum Corner: Int, CaseIterable {

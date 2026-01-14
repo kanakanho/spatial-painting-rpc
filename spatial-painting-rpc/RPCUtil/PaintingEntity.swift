@@ -81,6 +81,23 @@ class Painting:ObservableObject {
             controlPointId: param.controlPointId
         )
     }
+    
+    /// ストロークを再表示する（Undo用）
+    func restoreStroke(param: RestoreStrokeParam) {
+        paintingCanvas.addBezierStroke(param.stroke)
+    }
+    
+    /// 複数のストロークを再表示する（Undo用）
+    func restoreStrokes(param: RestoreStrokesParam) {
+        paintingCanvas.addBezierStrokes(param.strokes)
+    }
+    
+    /// 複数のストロークを削除する
+    func removeStrokes(param: RemoveStrokesParam) {
+        for strokeId in param.uuids {
+            paintingCanvas.removeStroke(strokeId: strokeId)
+        }
+    }
 }
 
 struct PaintingEntity: RPCEntity {
@@ -95,6 +112,9 @@ struct PaintingEntity: RPCEntity {
         case changeFingerLineWidth
         case moveControlPoint
         case finishControlPoint
+        case restoreStroke
+        case restoreStrokes
+        case removeStrokes
     }
     
     enum Param: RPCEntityParam {
@@ -108,6 +128,9 @@ struct PaintingEntity: RPCEntity {
         case changeFingerLineWidth(ChangeFingerLineWidthParam)
         case moveControlPoint(MoveControlPointParam)
         case finishControlPoint(FinishControlPointParam)
+        case restoreStroke(RestoreStrokeParam)
+        case restoreStrokes(RestoreStrokesParam)
+        case removeStrokes(RemoveStrokesParam)
         
         struct SetStrokeColorParam: Codable {
             let userId: UUID
@@ -157,6 +180,18 @@ struct PaintingEntity: RPCEntity {
             let controlPointId: UUID
         }
         
+        struct RestoreStrokeParam: Codable {
+            let stroke: BezierStroke
+        }
+        
+        struct RestoreStrokesParam: Codable {
+            let strokes: [BezierStroke]
+        }
+        
+        struct RemoveStrokesParam: Codable {
+            let uuids: [UUID]
+        }
+        
         func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             switch self {
@@ -180,6 +215,12 @@ struct PaintingEntity: RPCEntity {
                 try container.encode(param, forKey: .moveControlPoint)
             case .finishControlPoint(let param):
                 try container.encode(param, forKey: .finishControlPoint)
+            case .restoreStroke(let param):
+                try container.encode(param, forKey: .restoreStroke)
+            case .restoreStrokes(let param):
+                try container.encode(param, forKey: .restoreStrokes)
+            case .removeStrokes(let param):
+                try container.encode(param, forKey: .removeStrokes)
             }
         }
         
@@ -205,6 +246,12 @@ struct PaintingEntity: RPCEntity {
                 self = .moveControlPoint(param)
             } else if let param = try? container.decode(FinishControlPointParam.self, forKey: .finishControlPoint) {
                 self = .finishControlPoint(param)
+            } else if let param = try? container.decode(RestoreStrokeParam.self, forKey: .restoreStroke) {
+                self = .restoreStroke(param)
+            } else if let param = try? container.decode(RestoreStrokesParam.self, forKey: .restoreStrokes) {
+                self = .restoreStrokes(param)
+            } else if let param = try? container.decode(RemoveStrokesParam.self, forKey: .removeStrokes) {
+                self = .removeStrokes(param)
             } else {
                 throw DecodingError.dataCorruptedError(forKey: CodingKeys.setStrokeColor, in: container, debugDescription: "Invalid parameter type")
             }
@@ -221,6 +268,9 @@ struct PaintingEntity: RPCEntity {
             case changeFingerLineWidth
             case moveControlPoint
             case finishControlPoint
+            case restoreStroke
+            case restoreStrokes
+            case removeStrokes
         }
     }
 }
@@ -235,3 +285,6 @@ typealias FinishStrokeParam = PaintingEntity.Param.FinishStrokeParam
 typealias ChangeFingerLineWidthParam = PaintingEntity.Param.ChangeFingerLineWidthParam
 typealias MoveControlPointParam = PaintingEntity.Param.MoveControlPointParam
 typealias FinishControlPointParam = PaintingEntity.Param.FinishControlPointParam
+typealias RestoreStrokeParam = PaintingEntity.Param.RestoreStrokeParam
+typealias RestoreStrokesParam = PaintingEntity.Param.RestoreStrokesParam
+typealias RemoveStrokesParam = PaintingEntity.Param.RemoveStrokesParam
