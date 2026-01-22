@@ -15,6 +15,7 @@ enum Method: Codable {
     case error(ErrorEntitiy.Method)
     case coordinateTransformEntity(CoordinateTransformEntity.Method)
     case paintingEntity(PaintingEntity.Method)
+    case acknowledgment(AcknowledgmentEntity.Method)
 }
 
 /// PRC の Param として Entity を定義
@@ -22,6 +23,7 @@ enum Param: Codable {
     case error(ErrorEntitiy.Param)
     case coordinateTransformEntity(CoordinateTransformEntity.Param)
     case paintingEntity(PaintingEntity.Param)
+    case acknowledgment(AcknowledgmentEntity.Param)
     
     /// カスタムエンコード
     func encode(to encoder: Encoder) throws {
@@ -33,6 +35,8 @@ enum Param: Codable {
             try container.encode(param, forKey: .coordinateTransformEntity)
         case .paintingEntity(let param):
             try container.encode(param, forKey: .paintingEntity)
+        case .acknowledgment(let param):
+            try container.encode(param, forKey: .acknowledgment)
         }
     }
     
@@ -45,6 +49,8 @@ enum Param: Codable {
             self = .coordinateTransformEntity(param)
         } else if let param = try? container.decode(PaintingEntity.Param.self, forKey: .paintingEntity) {
             self = .paintingEntity(param)
+        } else if let param = try? container.decode(AcknowledgmentEntity.Param.self, forKey: .acknowledgment) {
+            self = .acknowledgment(param)
         } else {
             throw DecodingError.dataCorruptedError(forKey: CodingKeys.error, in: container, debugDescription: "Invalid parameter type")
         }
@@ -55,6 +61,7 @@ enum Param: Codable {
         case error
         case coordinateTransformEntity
         case paintingEntity
+        case acknowledgment
     }
 }
 
@@ -127,6 +134,20 @@ struct RequestSchema: Codable {
         self.param = .paintingEntity(param)
     }
     
+    init(id: UUID, peerId: Int, method: AcknowledgmentEntity.Method, param: AcknowledgmentEntity.Param) {
+        self.id = id
+        self.peerId = peerId
+        self.method = .acknowledgment(method)
+        self.param = .acknowledgment(param)
+    }
+    
+    init(peerId: Int, method: AcknowledgmentEntity.Method, param: AcknowledgmentEntity.Param) {
+        self.id = UUID()
+        self.peerId = peerId
+        self.method = .acknowledgment(method)
+        self.param = .acknowledgment(param)
+    }
+    
     /// カスタムエンコード
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -183,12 +204,20 @@ class RPCModel: ObservableObject {
     private let jsonDecoder = JSONDecoder()
     private let jsonEncoder = JSONEncoder()
     
+    /// リクエストキュー（再送管理用）
+    private let requestQueue = RequestQueue()
+    
     init(sendExchangeDataWrapper: ExchangeDataWrapper, receiveExchangeDataWrapper: ExchangeDataWrapper, mcPeerIDUUIDWrapper: MCPeerIDUUIDWrapper) {
         self.sendExchangeDataWrapper = sendExchangeDataWrapper
         self.receiveExchangeDataWrapper = receiveExchangeDataWrapper
         self.mcPeerIDUUIDWrapper = mcPeerIDUUIDWrapper
         cancellable = receiveExchangeDataWrapper.$exchangeData.sink { [weak self] exchangeData in
             self?.receiveExchangeDataDidChange(exchangeData)
+        }
+        
+        // リクエストキューの再送コールバックを設定
+        requestQueue.onRetry = { [weak self] request in
+            self?.resendRequest(request)
         }
     }
     
@@ -203,6 +232,26 @@ class RPCModel: ObservableObject {
     
     @Published var coordinateTransforms = CoordinateTransforms()
     @Published var painting = Painting()
+    
+    /// 再送処理から除外するメソッドかどうかを判定
+    /// 
+    /// 送信順序を必ず維持しなければいけないメソッドでは、再送処理はノイズになるため
+    /// 再送処理の対象から除外されます。これらのメソッドは：
+    /// - キューに追加されません
+    /// - acknowledgment を送信しません
+    /// - タイムアウトによる再送が行われません
+    /// 
+    /// - Parameter method: チェックするメソッド
+    /// - Returns: 除外する場合はtrue
+    private func shouldExcludeFromRetry(_ method: Method) -> Bool {
+        switch method {
+        case .paintingEntity(.addStrokePoint),
+             .paintingEntity(.addBezierStrokePoints):
+            return true
+        default:
+            return false
+        }
+    }
     
     /// RPC の実行と RPC リクエストの送信
     ///
@@ -244,6 +293,12 @@ class RPCModel: ObservableObject {
         guard let requestData = try? jsonEncoder.encode(request) else {
             return RPCResult("Failed to encode request")
         }
+        
+        // リクエストをキューに追加（除外対象のメソッドは追加しない）
+        if !shouldExcludeFromRetry(request.method) {
+            requestQueue.enqueue(request)
+        }
+        
         sendExchangeDataWrapper.setData(requestData)
         return rpcResult
     }
@@ -291,6 +346,12 @@ class RPCModel: ObservableObject {
         guard let requestData = try? jsonEncoder.encode(request) else {
             return RPCResult("Failed to encode request")
         }
+        
+        // リクエストをキューに追加（除外対象のメソッドは追加しない）
+        if !shouldExcludeFromRetry(request.method) {
+            requestQueue.enqueue(request)
+        }
+        
         sendExchangeDataWrapper.setData(requestData, to: mcPeerId)
         return rpcResult
     }
@@ -302,6 +363,13 @@ class RPCModel: ObservableObject {
 //        print("receiveRequest")
 //        print("ReceiveMethod: \(request.method)")
 //        print("ReceiveParam \(request.param)")
+        
+        // acknowledgment メッセージの処理
+        if case let (.acknowledgment(.ack), .acknowledgment(.ack(param))) = (request.method, request.param) {
+            // 受信したackに対応するリクエストをキューから削除
+            requestQueue.dequeue(param.requestId)
+            return RPCResult()
+        }
         
         var rpcResult = RPCResult()
         switch (request.method, request.param) {
@@ -339,6 +407,12 @@ class RPCModel: ObservableObject {
         if !rpcResult.success {
             return error(message: rpcResult.errorMessage, to: request.peerId)
         }
+        
+        // リクエストが成功したら acknowledgment を送信（除外対象のメソッドは送信しない）
+        if !shouldExcludeFromRetry(request.method) {
+            sendAcknowledgment(requestId: request.id, to: request.peerId)
+        }
+        
         return rpcResult
     }
     
@@ -355,5 +429,42 @@ class RPCModel: ObservableObject {
         }
         sendExchangeDataWrapper.setData(requestData, to: peerId)
         return RPCResult(message)
+    }
+    
+    /// Acknowledgment を送信
+    /// - Parameters:
+    ///     - requestId: 確認するリクエストの ID
+    ///     - to peerId: 送信先の Peer の ID
+    private func sendAcknowledgment(requestId: UUID, to peerId: Int) {
+        let ackRequest = RequestSchema(
+            peerId: mcPeerIDUUIDWrapper.mine.hash,
+            method: .ack,
+            param: .ack(AckParam(requestId: requestId))
+        )
+        
+        guard let requestData = try? jsonEncoder.encode(ackRequest) else {
+            print("Failed to encode acknowledgment")
+            return
+        }
+        
+        sendExchangeDataWrapper.setData(requestData, to: peerId)
+    }
+    
+    /// リクエストを再送信
+    /// - Parameter request: 再送信するリクエスト
+    private func resendRequest(_ request: RequestSchema) {
+        guard let requestData = try? jsonEncoder.encode(request) else {
+            print("Failed to encode request for resend")
+            return
+        }
+        
+        // リクエストの送信先に応じて送信
+        // mcPeerIdが0でない場合は特定のピアに送信
+        if let peerID = mcPeerIDUUIDWrapper.standby.first(where: { $0.hash == request.peerId }) {
+            sendExchangeDataWrapper.setData(requestData, to: peerID.hash)
+        } else {
+            // 該当するピアが見つからない場合は全ピアに送信
+            sendExchangeDataWrapper.setData(requestData)
+        }
     }
 }
