@@ -70,6 +70,9 @@ class ViewModel {
     // ストロークを選択するモード added by nagao 2025/11/21
     var isSelectorMode: Bool = false
     
+    // ペンのボタンを押しているかどうか added by nagao 2025/12/31
+    var isStylusButtonPressed: Bool = false
+
     // added by nagao 2025/6/18
     var handSphereEntity: Entity? = nil
     
@@ -181,8 +184,11 @@ class ViewModel {
         editModeEntity.removeFromParent()
         bezierModeEntity.removeFromParent()
     }
-    
-    let fingerEntities: [HandAnchor.Chirality: ModelEntity] = [/*.left: .createFingertip(name: "L", color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 1.0)),*/ .right: .createFingertip(name: "R", color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 1.0))]
+        
+    let fingerEntities: [HandAnchor.Chirality: ModelEntity] = [/*.left: .createFingertip(name: "L", color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 1.0)),*/ .right: .createFingertip(name: "R", color: SimpleMaterial.Color.white)]
+
+    // added by nagao 2025/12/31
+    let stylusTipEntity: ModelEntity = .createFingertip(name: "StylusTipIndicator", color: SimpleMaterial.Color.white)
     
     func setupContentEntity() -> Entity {
         for entity in fingerEntities.values {
@@ -191,6 +197,8 @@ class ViewModel {
         
         contentEntity.addChild(initBallEntity)
         
+        contentEntity.addChild(stylusTipEntity) // added by nagao 2025/12/31
+
         // 位置合わせする座標を教えてくれる球体の追加
         let indexFingerTipGuideBall = ModelEntity(
             mesh: .generateSphere(radius: 0.02),
@@ -280,6 +288,7 @@ class ViewModel {
                 }
                 //print("Selected color ball: \(colorBall!.id)  \(colorBall!.hue)  \(colorBall!.brightness)  \(colorBall!.isSelected)")
             }
+            colorPalletModel.selectedColorName = colorName // added by nagao 2025/12/31
         }
     }
     
@@ -336,8 +345,23 @@ class ViewModel {
             }
         }
         colorPalletModel.selectedBasicColorName = ""
+        //colorPalletModel.selectedColorName = ""
     }
     
+    // added by nagao 2025/12/31
+    func recallColor(entity: Entity) {
+        let colorName: String = colorPalletModel.selectedColorName
+        print("Finger color recalled to: \(colorName)")
+        if colorName == "" {
+            return
+        }
+        if let color: UIColor = colorPalletModel.colorDictionary[colorName] {
+            let material = SimpleMaterial(color: color, isMetallic: false)
+            entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [material]))
+        }
+        isEraserMode = false
+    }
+
     // added by nagao 2025/7/17
     func changeFingerLineWidth(entity: Entity, toolName: String, activeColor: UIColor) {
         //print("Finger line width changed to: \(toolName)")

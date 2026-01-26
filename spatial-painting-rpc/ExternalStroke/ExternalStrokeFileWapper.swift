@@ -57,7 +57,7 @@ class ExternalStrokeFileWapper {
             }
             try imageData.write(to: imageFileURL)
             print("Image written to: \(imageFileURL.path)")
-            systemSoundPlayer.play(systemSound: .cameraShutterSound)
+            //systemSoundPlayer.play(systemSound: .cameraShutterSound)
         } catch {
             print("Error writing file: \(error)")
         }

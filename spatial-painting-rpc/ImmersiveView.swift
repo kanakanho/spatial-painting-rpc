@@ -9,8 +9,14 @@ import SwiftUI
 import ARKit
 import RealityKit
 import RealityKitContent
+import CoreHaptics
+import GameController
 
 struct ImmersiveView: View {
+    // added by nagao 2025/12/31
+    @State private var stylusManager = StylusManager()
+    @State private var trackingSession = SpatialTrackingSession()
+
     @EnvironmentObject private var appModel: AppModel
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     @Environment(\.openWindow) private var openWindow: OpenWindowAction
@@ -22,8 +28,6 @@ struct ImmersiveView: View {
     @State private var initIndexPose: SIMD3<Float>? = nil
 
     @State private var sourceTransform: Transform? = nil
-    
-    @State private var lastControlIndexPose: SIMD3<Float>? = nil
     
     private let keyDownHeight: Float = 0.005
     
@@ -77,6 +81,15 @@ struct ImmersiveView: View {
                 let contentEntity: Entity = appModel.model.setupContentEntity()
                 content.add(contentEntity)
                 
+                // added by nagao 2025/12/31
+                stylusManager.rootEntity = contentEntity
+                stylusManager.appModel = appModel
+                let configuration = SpatialTrackingSession.Configuration(tracking: [.world, .accessory])
+                await stylusManager.handleControllerSetup()
+                Task {
+                    await trackingSession.run(configuration)
+                }
+
                 /// ColorPalletModel の初期化
                 appModel.model.initColorPalletModel(colorPalletModel: appModel.rpcModel.painting.advancedColorPalletModel)
                 content.add(appModel.rpcModel.painting.advancedColorPalletModel.colorPalletEntity)
@@ -141,6 +154,13 @@ struct ImmersiveView: View {
         .task {
             appModel.model.showFingerTipSpheres()
         }
+        .task {
+            // added by nagao 2025/12/31
+            // Don't forget to add the Accessory Tracking capability
+            //let configuration = SpatialTrackingSession.Configuration(tracking: [.accessory])
+            //let session = SpatialTrackingSession()
+            //await session.run(configuration)
+        }
         .onChange(of: appModel.model.isArrowShown) {
             Task {
                 if appModel.model.isArrowShown {
@@ -164,7 +184,54 @@ struct ImmersiveView: View {
                     }
 
                     if appModel.rpcModel.painting.paintingCanvas.isControlMode {
-                        if appModel.rpcModel.painting.paintingCanvas.isBezierSelected, let pos: SIMD3<Float> = lastIndexPose, let initPos: SIMD3<Float> = initIndexPose
+                        if appModel.rpcModel.painting.paintingCanvas.isBezierSelected, let anchor = stylusManager.stylusAnchorEntity
+                        {
+                            let worldTransform = anchor.transformMatrix(relativeTo: nil)
+                            let pos = SIMD3<Float>(
+                                worldTransform.columns.3.x,
+                                worldTransform.columns.3.y,
+                                worldTransform.columns.3.z
+                            )
+                            if initIndexPose == nil {
+                                initIndexPose = pos
+                                return
+                            }
+                            let initPos: SIMD3<Float> = initIndexPose!
+                            let dist: Float = distance(initPos, pos)
+                            //print("Distance between pos and initPos: \(dist)")
+                            if dist < 0.01 || dist > 0.5 {
+                                return
+                            }
+                            
+                            let entity = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
+                            let comp = entity.components[BezierStrokeControlComponent.self]
+                            let entityPos: SIMD3<Float> = appModel.rpcModel.painting.paintingCanvas.selectedBezierPosition
+
+                            appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
+                                strokeId: comp!.bezierStrokeId,
+                                controlPointId: comp!.bezierPointId,
+                                controlType: comp!.controlType,
+                                newPosition: entityPos + pos - initPos
+                            )
+                            for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                                let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, entityPos + pos - initPos)
+                                _ = appModel.rpcModel.sendRequest(
+                                    RequestSchema(
+                                        peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                                        method: .moveControlPoint,
+                                        param: .moveControlPoint(
+                                            .init(
+                                                strokeId: comp!.bezierStrokeId,
+                                                controlPointId: comp!.bezierPointId,
+                                                controlType: comp!.controlType,
+                                                newPosition: clientPos
+                                            )
+                                        )
+                                    ),
+                                    mcPeerId: id
+                                )
+                            }
+                        } else if appModel.rpcModel.painting.paintingCanvas.isBezierSelected, stylusManager.stylusAnchorEntity == nil, let pos: SIMD3<Float> = lastIndexPose, let initPos: SIMD3<Float> = initIndexPose
                         {
                             let dist: Float = distance(initPos, pos)
                             //print("Distance between pos and initPos: \(dist)")
@@ -252,9 +319,42 @@ struct ImmersiveView: View {
                         }
                     }
                     /// ストロークの点の追加
-                    else if !appModel.model.isEraserMode,
+                    else if !appModel.model.isEraserMode, appModel.model.authoringMode == .draw,
                             appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
-                            let pos: SIMD3<Float> = lastIndexPose {
+                            /*appModel.model.isStylusButtonPressed,*/ let anchor = stylusManager.stylusAnchorEntity {
+                        isCurrentSendPoint.toggle()
+                        if isCurrentSendPoint {
+                            return
+                        }
+                        let worldTransform = anchor.transformMatrix(relativeTo: nil)
+                        let pos = SIMD3<Float>(
+                            worldTransform.columns.3.x,
+                            worldTransform.columns.3.y,
+                            worldTransform.columns.3.z
+                        )
+                        let uuid: UUID = UUID()
+                        appModel.rpcModel.painting.paintingCanvas.addPoint(uuid, pos, userId: appModel.mcPeerIDUUIDWrapper.myId)
+                        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                            let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, pos)
+                            _ = appModel.rpcModel.sendRequest(
+                                RequestSchema(
+                                    peerId: appModel.rpcModel.mcPeerIDUUIDWrapper.mine.hash,
+                                    method: .addStrokePoint,
+                                    param: .addStrokePoint(
+                                        .init(
+                                            uuid: uuid,
+                                            point: clientPos,
+                                            userId: appModel.mcPeerIDUUIDWrapper.myId
+                                        )
+                                    )
+                                ),
+                                mcPeerId: id
+                            )
+                        }
+                    }
+                    else if !appModel.model.isEraserMode, appModel.model.authoringMode == .draw,
+                            appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
+                            stylusManager.stylusAnchorEntity == nil, let pos: SIMD3<Float> = lastIndexPose {
                         isCurrentSendPoint.toggle()
                         if isCurrentSendPoint {
                             return
@@ -308,7 +408,7 @@ struct ImmersiveView: View {
                         return
                     }
                     
-                    if !appModel.model.isEraserMode,
+                    if !appModel.model.isEraserMode, appModel.model.authoringMode == .draw,
                        appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial {
                         // 自分の端末の中でベジェ曲線化
                         guard let bezierStroke: BezierStroke = appModel.rpcModel.painting.paintingCanvas.individualPoints2Bezier(userId: appModel.mcPeerIDUUIDWrapper.myId) else {
@@ -402,6 +502,9 @@ extension ImmersiveView {
             subscribeBegan(on: finger, content: content)
             subscribeEnded(on: finger, content: content)
         }
+        // added by nagao 2015/12/31
+        subscribeBegan(on: appModel.model.stylusTipEntity, content: content)
+        subscribeEnded(on: appModel.model.stylusTipEntity, content: content)
     }
     
     private func subscribeBegan(on entity: Entity, content: RealityViewContent) {
@@ -423,10 +526,20 @@ extension ImmersiveView {
             activateEraser(finger: finger)
         }
         else if name == "bezierEndPoint" {
-            selectBezierEndPoint(event.entityB)
+            if initIndexPose == nil { // added by nagao 2025/12/26
+                selectBezierEndPoint(event.entityB)
+            } else if stylusManager.stylusAnchorEntity != nil { // added by nagao 2025/12/31
+                initIndexPose = nil
+                selectBezierEndPoint(event.entityB)
+            }
         }
         else if name == "bezierHandle" {
-            selectBezierHandle(event.entityB)
+            if initIndexPose == nil { // added by nagao 2025/12/26
+                selectBezierHandle(event.entityB)
+            } else if stylusManager.stylusAnchorEntity != nil { // added by nagao 2025/12/31
+                initIndexPose = nil
+                selectBezierHandle(event.entityB)
+            }
         }
         else if event.entityB.hasStrokeRootComponent, appModel.model.isEraserMode, appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty, !appModel.rpcModel.painting.paintingCanvas.isControlMode {
             deleteStroke(event.entityB)
@@ -584,6 +697,7 @@ extension ImmersiveView {
                     planeNormalVector: appModel.model.planeNormalVector,
                     planePoint: appModel.model.planePoint
                 )
+                appModel.model.colorPalletModel.playCameraShutterSound()
             }
         }
         else if name == "button2" {
@@ -805,6 +919,257 @@ extension ImmersiveView {
             }
         }
         appModel.externalStrokeFileWapper.isFileManagerActive.toggle()
+    }
+}
+
+@MainActor
+final class StylusManager {
+    var rootEntity: Entity?
+    var appModel: AppModel?
+    var stylusAnchorEntity: AnchorEntity? = nil
+    private var hapticEngines: [ObjectIdentifier: CHHapticEngine] = [:]
+    private var hapticPlayers: [ObjectIdentifier: CHHapticPatternPlayer] = [:]
+
+    // 現在のスタイラスを特定するためのキー
+    private var currentStylusKey: ObjectIdentifier?
+
+    func handleControllerSetup() async {
+        // Existing connections
+        let styluses = GCStylus.styli
+
+        for stylus in styluses where stylus.productCategory == GCProductCategorySpatialStylus {
+            try? await stylusAnchorEntity = setupAccessory(stylus: stylus)
+        }
+
+        // Connect
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.GCStylusDidConnect, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let stylus = note.object as? GCStylus,
+                  stylus.productCategory == GCProductCategorySpatialStylus else { return }
+
+            Task { @MainActor in
+                do {
+                    let anchor = try await self.setupAccessory(stylus: stylus)
+                    self.stylusAnchorEntity = anchor
+                    self.currentStylusKey = ObjectIdentifier(stylus)
+
+                    if let appModel = self.appModel {
+                        for finger in appModel.model.fingerEntities.values {
+                            finger.removeFromParent()
+                        }
+                    }
+                } catch {
+                    // ignore / log
+                }
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.GCStylusDidDisconnect, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let stylus = note.object as? GCStylus,
+                  stylus.productCategory == GCProductCategorySpatialStylus else { return }
+
+            Task { @MainActor in
+                let key = ObjectIdentifier(stylus)
+                guard key == self.currentStylusKey else { return }
+
+                // 必要ならシーンからも外す
+                //self.stylusAnchorEntity?.removeFromParent()
+
+                // nil にする
+                self.stylusAnchorEntity = nil
+                self.currentStylusKey = nil
+
+                if let appModel = self.appModel {
+                    for finger in appModel.model.fingerEntities.values {
+                        appModel.model.contentEntity.addChild(finger)
+                        appModel.model.recallColor(entity: finger)
+                    }
+                }
+            }
+        }
+    }
+
+    private func setupAccessory(stylus: GCStylus) async throws -> AnchorEntity? {
+        guard let root = rootEntity else { return nil }
+        let source = try await AnchoringComponent.AccessoryAnchoringSource(device: stylus)
+        
+        // List available locations (aim and origin appear to be possible)
+        print("📍 Available locations: \(source.accessoryLocations)")
+
+        guard let location = source.locationName(named: "aim") else { return nil }
+
+        let anchor = AnchorEntity(
+            .accessory(from: source, location: location),
+            trackingMode: .predicted,
+            physicsSimulation: .none
+        )
+        root.addChild(anchor)
+
+        let key = ObjectIdentifier(stylus)
+        currentStylusKey = key
+
+        // Setup haptics if available
+        setupHaptics(for: stylus, key: key)
+        setupStylusInputs(stylus: stylus, anchor: anchor, key: key)
+        addStylusTipIndicator(to: anchor)
+        
+        if let appModel = self.appModel {
+            for finger in appModel.model.fingerEntities.values {
+                finger.removeFromParent()
+            }
+        }
+
+        return anchor
+    }
+
+    private func setupHaptics(for stylus: GCStylus, key: ObjectIdentifier) {
+        guard let deviceHaptics = stylus.haptics else { return }
+        
+        // Create haptic engine
+        let engine = deviceHaptics.createEngine(withLocality: .default)
+        do {
+            try engine?.start()
+            hapticEngines[key] = engine
+            
+            // Create a simple "tap" pattern for button presses
+            let pattern = try CHHapticPattern(events: [
+                CHHapticEvent(eventType: .hapticTransient, parameters: [
+                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8),
+                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.5)
+                ], relativeTime: 0.0)
+            ], parameters: [])
+            
+            let player = try engine?.makePlayer(with: pattern)
+            hapticPlayers[key] = player
+        } catch {
+            print("❌ Failed to setup haptics: \(error)")
+        }
+    }
+    
+    private func playHaptic(for key: ObjectIdentifier) {
+        guard let player = hapticPlayers[key] else { return }
+        
+        do {
+            try player.start(atTime: CHHapticTimeImmediate)
+        } catch {
+            print("❌ Failed to play haptic: \(error)")
+        }
+    }
+
+    private func addStylusTipIndicator(to anchor: AnchorEntity) {
+        if let tipEntity = appModel?.model.stylusTipEntity {
+            appModel!.model.recallColor(entity: tipEntity)
+            anchor.addChild(tipEntity)
+        } else {
+            let tipSphere = ModelEntity(
+                mesh: .generateSphere(radius: 0.003),
+                materials: [SimpleMaterial(color: .white, isMetallic: false)]
+            )
+            tipSphere.name = "StylusTipIndicator"
+            anchor.addChild(tipSphere)
+        }
+    }
+
+    private func setupStylusInputs(stylus: GCStylus, anchor: AnchorEntity, key: ObjectIdentifier) {
+        guard let input = stylus.input else { return }
+        print("✏️[input] started: \(input)")
+
+        let primary   = input.buttons[.stylusPrimaryButton]
+        let secondary = input.buttons[.stylusSecondaryButton]
+        let tip       = input.buttons[.stylusTip]
+
+        print("stylusPrimaryButton exists:", primary != nil)
+        print("stylusSecondaryButton exists:", secondary != nil)
+        print("stylusTip exists:", tip != nil)
+
+        // tipは別用途（何もしない）にする
+        tip?.pressedInput.valueDidChangeHandler = { _, value, pressed in
+            // ここでは primary 処理を呼ばない
+        }
+
+        primary?.pressedInput.pressedDidChangeHandler = { [weak self] _, _, pressed in
+            guard let self else {
+                print("✏️[PrimaryButton] self is nil")
+                return
+            }
+            Task { @MainActor in
+                if pressed {
+                    print("✏️[PrimaryButton] pressed: \(pressed)")
+                    self.playHaptic(for: key)
+                    self.spawnSphere(at: anchor, color: .systemBlue, radius: 0.01)
+                    self.appModel!.model.isStylusButtonPressed = true
+                    if self.appModel!.model.isEraserMode {
+                        let entity = anchor.findEntity(named: "StylusTipIndicator")
+                        self.appModel!.model.recallColor(entity: entity!)
+                        self.appModel!.model.isEraserMode = false
+                    }
+                } else {
+                    self.appModel!.model.isStylusButtonPressed = false
+                }
+            }
+        }
+
+        secondary?.pressedInput.pressedDidChangeHandler = { [weak self] _, _, pressed in
+            guard let self else {
+                print("✏️[SecondaryButton] self is nil")
+                return
+            }
+            Task { @MainActor in
+                if pressed {
+                    print("✏️[SecondaryButton] pressed: \(pressed)")
+                    self.playHaptic(for: key)
+                    self.spawnSphere(at: anchor, color: .systemRed, radius: 0.01)
+                    let eraserMat = SimpleMaterial(
+                        color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.2),
+                        isMetallic: true
+                    )
+                    let entity = anchor.findEntity(named: "StylusTipIndicator")
+                    entity!.components.set(
+                        ModelComponent(
+                            mesh: .generateSphere(radius: 0.01),
+                            materials: [eraserMat]
+                        )
+                    )
+                    self.appModel!.model.isEraserMode = true
+                    self.appModel!.model.colorPalletModel.selectedToolName = "eraser"
+                    _ = self.appModel!.model.recordTime(isBegan: true)
+                } else {
+                    if self.appModel!.model.recordTime(isBegan: false) {
+                        _ = self.appModel!.rpcModel.sendRequest(
+                            RequestSchema(
+                                peerId: self.appModel!.mcPeerIDUUIDWrapper.mine.hash,
+                                method: .removeAllStroke,
+                                param: .removeAllStroke(.init())
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func spawnSphere(at anchor: AnchorEntity, color: UIColor, radius: Float) {
+        guard let root = rootEntity else { return }
+        
+        let worldTransform = anchor.transformMatrix(relativeTo: nil)
+        let worldPosition = SIMD3<Float>(worldTransform.columns.3.x,
+                                          worldTransform.columns.3.y,
+                                          worldTransform.columns.3.z)
+        
+        let sphere = ModelEntity(
+            mesh: .generateSphere(radius: radius),
+            materials: [SimpleMaterial(color: color, isMetallic: false)]
+        )
+        sphere.position = worldPosition
+        sphere.components.set(InputTargetComponent(allowedInputTypes: [.all]))
+        sphere.components.set(CollisionComponent(shapes: [ShapeResource.generateSphere(radius: 0.01)], isStatic: true))
+
+        root.addChild(sphere)
     }
 }
 
