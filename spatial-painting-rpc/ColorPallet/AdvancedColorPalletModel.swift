@@ -115,6 +115,8 @@ class AdvancedColorPalletModel {
     
     var selectedBasicColorName = ""
     
+    var selectedColorName = "m1" // added by nagao 2025/12/31
+
     var selectedToolName = ""
     
     let colorPanelNames: [String] = ["RedColors", "OrangeColors", "YellowColors", "GreenColors", "CyanColors", "BlueColors", "VioletColors", "PinkColors"]
@@ -191,6 +193,7 @@ class AdvancedColorPalletModel {
     func setSceneEntity(scene: Entity) {
         sceneEntity = scene
         isSoundEnabled = loadSound()
+        isSoundEnabled2 = loadSound2()
         isSoundEnabled3 = loadSound3()
         isSoundEnabled4 = loadSound4()
         
@@ -441,6 +444,18 @@ class AdvancedColorPalletModel {
         }
     }
     
+    func loadSound2() -> Bool {
+        guard let soundURL = Bundle.main.url(forResource: "shutter", withExtension: "mp3") else { return false }
+        
+        do {
+            player2 = try AVAudioPlayer(contentsOf: soundURL)
+            return true
+        } catch {
+            print("音声ファイルの読み込みに失敗しました")
+            return false
+        }
+    }
+    
     func loadSound3() -> Bool {
         guard let soundURL = Bundle.main.url(forResource: "bezierPoint", withExtension: "mp3") else { return false }
         
@@ -462,6 +477,12 @@ class AdvancedColorPalletModel {
         } catch {
             print("音声ファイルの読み込みに失敗しました")
             return false
+        }
+    }
+    
+    func playCameraShutterSound() {
+        if isSoundEnabled2 {
+            player2?.play()
         }
     }
     

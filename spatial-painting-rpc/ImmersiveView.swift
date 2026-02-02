@@ -9,6 +9,8 @@ import SwiftUI
 import ARKit
 import RealityKit
 import RealityKitContent
+import CoreHaptics
+import GameController
 
 struct ImmersiveView: View {
     @EnvironmentObject private var appModel: AppModel
@@ -17,13 +19,16 @@ struct ImmersiveView: View {
     @Environment(\.dismissWindow) private var dismissWindow: DismissWindowAction
     @Environment(\.displayScale) private var displayScale: CGFloat
     
+    // added by nagao 2025/12/31
+    @State var stylusManager: StylusManager
+    @State private var trackingSession = SpatialTrackingSession()
+    let configuration = SpatialTrackingSession.Configuration(tracking: [.world, .accessory])
+    
     @State private var latestRightIndexFingerCoordinates: simd_float4x4 = .init()
     @State private var lastIndexPose: SIMD3<Float>? = nil
     @State private var initIndexPose: SIMD3<Float>? = nil
 
     @State private var sourceTransform: Transform? = nil
-    
-    @State private var lastControlIndexPose: SIMD3<Float>? = nil
     
     private let keyDownHeight: Float = 0.005
     
@@ -77,6 +82,15 @@ struct ImmersiveView: View {
                 let contentEntity: Entity = appModel.model.setupContentEntity()
                 content.add(contentEntity)
                 
+                // added by nagao 2025/12/31
+                stylusManager.rootEntity = contentEntity
+                stylusManager.appModel = appModel
+                let configuration = SpatialTrackingSession.Configuration(tracking: [.world, .accessory])
+                await stylusManager.handleControllerSetup()
+                Task {
+                    await trackingSession.run(configuration)
+                }
+
                 /// ColorPalletModel の初期化
                 appModel.model.initColorPalletModel(colorPalletModel: appModel.rpcModel.painting.advancedColorPalletModel)
                 content.add(appModel.rpcModel.painting.advancedColorPalletModel.colorPalletEntity)
@@ -133,6 +147,10 @@ struct ImmersiveView: View {
         .task {
             await appModel.model.processHandUpdates()
         }
+        .task(priority: .high) {
+            await stylusManager.handleControllerSetup()
+            await trackingSession.run(configuration)
+        }
         /// 空間検出の処理を起動
         .task(priority: .low) {
             await appModel.model.processReconstructionUpdates()
@@ -164,7 +182,50 @@ struct ImmersiveView: View {
                     }
 
                     if appModel.rpcModel.painting.paintingCanvas.isControlMode {
-                        if appModel.rpcModel.painting.paintingCanvas.isBezierSelected, let pos: SIMD3<Float> = lastIndexPose, let initPos: SIMD3<Float> = initIndexPose
+                        if appModel.rpcModel.painting.paintingCanvas.isBezierSelected, let anchor = stylusManager.stylusAnchorEntity
+                        {
+                            let worldTransform = anchor.transformMatrix(relativeTo: nil)
+                            let pos = worldTransform.position
+                            if initIndexPose == nil {
+                                initIndexPose = pos
+                                return
+                            }
+                            let initPos: SIMD3<Float> = initIndexPose!
+                            let dist: Float = distance(initPos, pos)
+                            //print("Distance between pos and initPos: \(dist)")
+                            if dist < 0.01 || dist > 0.5 {
+                                return
+                            }
+                            
+                            let entity = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
+                            let comp = entity.components[BezierStrokeControlComponent.self]
+                            let entityPos: SIMD3<Float> = appModel.rpcModel.painting.paintingCanvas.selectedBezierPosition
+
+                            appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
+                                strokeId: comp!.bezierStrokeId,
+                                controlPointId: comp!.bezierPointId,
+                                controlType: comp!.controlType,
+                                newPosition: entityPos + pos - initPos
+                            )
+                            for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                                let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, entityPos + pos - initPos)
+                                _ = appModel.rpcModel.sendRequest(
+                                    RequestSchema(
+                                        peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                                        method: .moveControlPoint,
+                                        param: .moveControlPoint(
+                                            .init(
+                                                strokeId: comp!.bezierStrokeId,
+                                                controlPointId: comp!.bezierPointId,
+                                                controlType: comp!.controlType,
+                                                newPosition: clientPos
+                                            )
+                                        )
+                                    ),
+                                    mcPeerId: id
+                                )
+                            }
+                        } else if appModel.rpcModel.painting.paintingCanvas.isBezierSelected, stylusManager.stylusAnchorEntity == nil, let pos: SIMD3<Float> = lastIndexPose, let initPos: SIMD3<Float> = initIndexPose
                         {
                             let dist: Float = distance(initPos, pos)
                             //print("Distance between pos and initPos: \(dist)")
@@ -251,10 +312,40 @@ struct ImmersiveView: View {
                             }
                         }
                     }
-                    /// ストロークの点の追加
-                    else if !appModel.model.isEraserMode,
+                    /// ストロークの点の追加 stylus 用
+                    else if !appModel.model.isEraserMode, appModel.model.authoringMode == .draw,
                             appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
-                            let pos: SIMD3<Float> = lastIndexPose {
+                            let anchor = stylusManager.stylusAnchorEntity {
+                        isCurrentSendPoint.toggle()
+                        if isCurrentSendPoint {
+                            return
+                        }
+                        let worldTransform = anchor.transformMatrix(relativeTo: nil)
+                        let pos = worldTransform.position
+                        let uuid: UUID = UUID()
+                        appModel.rpcModel.painting.paintingCanvas.addPoint(uuid, pos, userId: appModel.mcPeerIDUUIDWrapper.myId)
+                        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+                            let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, pos)
+                            _ = appModel.rpcModel.sendRequest(
+                                RequestSchema(
+                                    peerId: appModel.rpcModel.mcPeerIDUUIDWrapper.mine.hash,
+                                    method: .addStrokePoint,
+                                    param: .addStrokePoint(
+                                        .init(
+                                            uuid: uuid,
+                                            point: clientPos,
+                                            userId: appModel.mcPeerIDUUIDWrapper.myId
+                                        )
+                                    )
+                                ),
+                                mcPeerId: id
+                            )
+                        }
+                    }
+                    /// ストロークの点の追加 フリーハンド用
+                    else if !appModel.model.isEraserMode, appModel.model.authoringMode == .draw,
+                            appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
+                            stylusManager.stylusAnchorEntity == nil, let pos: SIMD3<Float> = lastIndexPose {
                         isCurrentSendPoint.toggle()
                         if isCurrentSendPoint {
                             return
@@ -308,8 +399,11 @@ struct ImmersiveView: View {
                         return
                     }
                     
-                    if !appModel.model.isEraserMode,
-                       appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial {
+                    if !appModel.model.isEraserMode, appModel.model.authoringMode == .draw,
+                       appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
+                       let stroke = appModel.rpcModel.painting.paintingCanvas.individualStrokeDic[self.appModel.mcPeerIDUUIDWrapper.myId], stroke.currentStroke != nil {
+                        print("🫟 send finishStroke")
+                        
                         // 自分の端末の中でベジェ曲線化
                         guard let bezierStroke: BezierStroke = appModel.rpcModel.painting.paintingCanvas.individualPoints2Bezier(userId: appModel.mcPeerIDUUIDWrapper.myId) else {
                             return
@@ -402,6 +496,9 @@ extension ImmersiveView {
             subscribeBegan(on: finger, content: content)
             subscribeEnded(on: finger, content: content)
         }
+        // added by nagao 2015/12/31
+        subscribeBegan(on: appModel.model.stylusTipEntity, content: content)
+        subscribeEnded(on: appModel.model.stylusTipEntity, content: content)
     }
     
     private func subscribeBegan(on entity: Entity, content: RealityViewContent) {
@@ -423,10 +520,20 @@ extension ImmersiveView {
             activateEraser(finger: finger)
         }
         else if name == "bezierEndPoint" {
-            selectBezierEndPoint(event.entityB)
+            if initIndexPose == nil { // added by nagao 2025/12/26
+                selectBezierEndPoint(event.entityB)
+            } else if stylusManager.stylusAnchorEntity != nil { // added by nagao 2025/12/31
+                initIndexPose = nil
+                selectBezierEndPoint(event.entityB)
+            }
         }
         else if name == "bezierHandle" {
-            selectBezierHandle(event.entityB)
+            if initIndexPose == nil { // added by nagao 2025/12/26
+                selectBezierHandle(event.entityB)
+            } else if stylusManager.stylusAnchorEntity != nil { // added by nagao 2025/12/31
+                initIndexPose = nil
+                selectBezierHandle(event.entityB)
+            }
         }
         else if event.entityB.hasStrokeRootComponent, appModel.model.isEraserMode, appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty, !appModel.rpcModel.painting.paintingCanvas.isControlMode {
             deleteStroke(event.entityB)
@@ -584,6 +691,7 @@ extension ImmersiveView {
                     planeNormalVector: appModel.model.planeNormalVector,
                     planePoint: appModel.model.planePoint
                 )
+                appModel.model.colorPalletModel.playCameraShutterSound()
             }
         }
         else if name == "button2" {
@@ -809,6 +917,7 @@ extension ImmersiveView {
 }
 
 #Preview(immersionStyle: .mixed) {
-    ImmersiveView()
-        .environmentObject(AppModel())
+    let appModel = AppModel()
+    ImmersiveView(stylusManager: StylusManager(appModel: appModel))
+        .environmentObject(appModel)
 }

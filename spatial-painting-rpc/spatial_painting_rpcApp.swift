@@ -25,7 +25,7 @@ struct spatial_painting_rpcApp: App {
         .handlesExternalEvents(matching: ["targetContentIdentifier"])
         
         ImmersiveSpace(id: appModel.immersiveSpaceID) {
-            ImmersiveView()
+            ImmersiveView(stylusManager: StylusManager(appModel: appModel))
                 .environmentObject(appModel)
                 .onAppear {
                     appModel.immersiveSpaceState = .open

@@ -244,7 +244,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
+				INFOPLIST_KEY_GCSupportsControllerUserInteraction = YES;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSAccessoryTrackingUsageDescription = "tracking accessory movements to draw strokes";
 				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "";
 				INFOPLIST_KEY_NSWorldSensingUsageDescription = "";
@@ -260,7 +262,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 7;
-				XROS_DEPLOYMENT_TARGET = 26.0;
+				XROS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Debug;
 		};
@@ -276,7 +278,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
+				INFOPLIST_KEY_GCSupportsControllerUserInteraction = YES;
 				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_NSAccessoryTrackingUsageDescription = "tracking accessory movements to draw strokes";
 				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "";
 				INFOPLIST_KEY_NSWorldSensingUsageDescription = "";
@@ -291,7 +295,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 7;
-				XROS_DEPLOYMENT_TARGET = 26.0;
+				XROS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Release;
 		};
