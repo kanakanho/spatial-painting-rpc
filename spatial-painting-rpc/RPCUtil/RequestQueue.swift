@@ -57,13 +57,13 @@ class RequestQueue: ObservableObject {
             maxRetries: maxRetries
         )
         pendingRequests[request.id] = queuedRequest
-        print("Enqueued request \(request.id) for tracking")
+//        print("Enqueued request \(request.id) for tracking")
     }
     
     /// Remove a request from the queue (called when ack is received)
     func dequeue(_ requestId: UUID) {
         pendingRequests.removeValue(forKey: requestId)
-        print("Dequeued request \(requestId) upon acknowledgment")
+//        print("Dequeued request \(requestId) upon acknowledgment")
     }
     
     /// Check if a request is in the queue
@@ -106,7 +106,7 @@ class RequestQueue: ObservableObject {
                 } else {
                     // Max retries reached, remove from queue
                     requestsToRemove.append(id)
-                    print("Request \(id) max retries reached, removing from queue")
+//                    print("Request \(id) max retries reached, removing from queue")
                 }
             }
         }
@@ -123,7 +123,7 @@ class RequestQueue: ObservableObject {
                 queuedRequest.timestamp = now
                 pendingRequests[id] = queuedRequest
                 
-                print("Retrying request \(id) (attempt \(queuedRequest.retryCount)/\(maxRetries))")
+                print("Retrying Request \(id) (\(queuedRequest.retryCount)/\(maxRetries)) \(queuedRequest.request.method)")
                 onRetry?(queuedRequest.request)
             }
         }
