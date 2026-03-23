@@ -17,6 +17,13 @@ struct spatial_painting_rpcApp: App {
                 .environmentObject(appModel)
         }
         
+        WindowGroup("RealityKitEntityListView", id: "RealityKitEntityListView") {
+            RealityKitEntityListView()
+                .environmentObject(appModel)
+                .handlesExternalEvents(preferring: [], allowing: [])
+        }
+        .handlesExternalEvents(matching: ["targetContentIdentifier"])
+        
         WindowGroup("ExternalStroke", id: "ExternalStroke") {
             ExternalStrokeView()
                 .environmentObject(appModel)

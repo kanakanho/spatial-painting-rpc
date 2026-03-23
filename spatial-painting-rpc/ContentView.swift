@@ -33,6 +33,11 @@ struct ContentView: View {
             }
             .padding(.horizontal)
             
+            Button("RealityKitEntityListView") {
+                openWindow(id: "RealityKitEntityListView")
+            }
+            .padding(.horizontal)
+            
             ToggleImmersiveSpaceButton()
                 .environmentObject(appModel)
 //                .disabled(!isStartImmersiveSpace)
