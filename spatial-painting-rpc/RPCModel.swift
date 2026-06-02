@@ -7,7 +7,6 @@
 
 import Foundation
 import simd
-import MultipeerConnectivity
 import Combine
 
 /// PRC の Method として Entity を定義
