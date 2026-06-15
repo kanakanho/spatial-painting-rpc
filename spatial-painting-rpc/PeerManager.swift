@@ -61,12 +61,12 @@ final class RPCNetworkManager {
             localPeerId: peerDirectory.myId,
             onRoleChanged: nil,
             onPeersChanged: { [weak peerDirectory] peerIds in
-                DispatchQueue.main.async {
+                Task {
                     peerDirectory?.setConnectedPeerIds(peerIds)
                 }
             },
             onReceiveData: { [weak receiveExchangeDataWrapper] data in
-                DispatchQueue.main.async {
+                Task {
                     receiveExchangeDataWrapper?.setData(data)
                 }
             }
@@ -230,15 +230,17 @@ final class RPCServer {
         parameters.includePeerToPeer = true
 
         let listener = try NWListener(using: parameters)
+        let txtFields: [String: String] = [
+            "peer_id": localPeerId.uuidString,
+            "priority": String(localPriority)
+        ]
+        let txtRecord = NWTXTRecord(txtFields)
 
         listener.service = NWListener.Service(
             name: localPeerId.uuidString,
             type: "_\(serviceType)._tcp",
             domain: "local.",
-            txtRecord: [
-                "peer_id": localPeerId.uuidString,
-                "priority": String(localPriority),
-            ].toTXTRecordData()
+            txtRecord: txtRecord,
         )
 
         let topologyManager = self.topologyManager
@@ -302,6 +304,7 @@ final class RPCBrowser: @unchecked Sendable {
                     print("RPCBrowser missing peerId for endpoint: \(result.endpoint), txtRecord: \(txtRecord)")
                     continue
                 }
+
                 let priority = Self.priority(from: txtRecord) ?? Self.fallbackPriority(from: peerId)
                 if txtRecord["priority"] == nil {
                     print("RPCBrowser using fallback priority for peerId: \(peerId)")
@@ -340,13 +343,25 @@ final class RPCBrowser: @unchecked Sendable {
         knownPeers.removeAll()
     }
 
+//    private static func parseTXTRecord(_ record: NWTXTRecord) -> [String: String] {
+//        let dict = NetService.dictionary(fromTXTRecord: record.data)
+//        var result: [String: String] = [:]
+//        for (key, value) in dict {
+//            if let string = String(data: value, encoding: .utf8) {
+//                result[key] = string
+//            }
+//        }
+//        return result
+//    }
+
     private static func parseTXTRecord(_ record: NWTXTRecord) -> [String: String] {
-        let dict = NetService.dictionary(fromTXTRecord: record.data)
         var result: [String: String] = [:]
-        for (key, value) in dict {
-            if let string = String(data: value, encoding: .utf8) {
-                result[key] = string
-            }
+        // 確実に安全にアンラップして取得
+        if let peerIdData = record["peer_id"] {
+            result["peer_id"] = peerIdData
+        }
+        if let priorityData = record["priority"] {
+            result["priority"] = priorityData
         }
         return result
     }
@@ -552,19 +567,5 @@ actor NetworkTopologyManager {
         let combined = Set(inboundIds).union(outboundIds)
         let peers = combined.filter { $0 != localPeerId }
         onPeersChanged?(Array(peers))
-    }
-}
-
-extension Dictionary where Key == String, Value == String {
-    fileprivate func toTXTRecordData() -> Data {
-        var txtData = Data()
-        for (key, value) in self {
-            let string = "\(key)=\(value)"
-            if let stringData = string.data(using: .utf8), stringData.count <= 255 {
-                txtData.append(UInt8(stringData.count))
-                txtData.append(stringData)
-            }
-        }
-        return txtData
     }
 }

@@ -24,7 +24,6 @@ struct ContentView: View {
     
     var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     var startTime = Date()
-    @State var isStartImmersiveSpace: Bool = false
     
     var body: some View {
         VStack {
@@ -35,7 +34,6 @@ struct ContentView: View {
             
             ToggleImmersiveSpaceButton()
                 .environmentObject(appModel)
-//                .disabled(!isStartImmersiveSpace)
             NavigationStack {
                 switch sharedCoordinateState {
                 case .prepare:
@@ -57,38 +55,7 @@ struct ContentView: View {
         }
         .padding()
         .onAppear() {
-            print(">>> App appeared")
-            appModel.peerManager.start()
             sharedCoordinateState = .prepare
-        }
-        .onChange(of: scenePhase) { oldScenePhase, newScenePhase in
-            if oldScenePhase == .inactive && newScenePhase == .active {
-                print(">>> Scene became active")
-                appModel.peerManager = PeerManager(
-                    sendExchangeDataWrapper: appModel.sendExchangeDataWrapper,
-                    receiveExchangeDataWrapper: appModel.receiveExchangeDataWrapper,
-                    mcPeerIDUUIDWrapper: appModel.mcPeerIDUUIDWrapper
-                )
-                appModel.peerManager.start()
-            }
-            if newScenePhase == .background {
-                print("<<< Scene went to background")
-                sharedCoordinateState = .prepare
-                appModel.mcPeerIDUUIDWrapper.standby.removeAll()
-                appModel.peerManager.stop()
-            }
-        }
-        .onReceive(timer) { _ in
-            // 5秒後にImmersive Spaceを開く
-            if  !isStartImmersiveSpace {
-                let elapsedTime = Date().timeIntervalSince(startTime)
-                if elapsedTime >= 3 {
-                    isStartImmersiveSpace = true
-                }
-            } else {
-                // timerを停止
-                timer.upstream.connect().cancel()
-            }
         }
     }
 }

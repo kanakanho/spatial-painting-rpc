@@ -194,11 +194,12 @@ class RPCModel: ObservableObject {
     private var sendExchangeDataWrapper = ExchangeDataWrapper()
     /// 受信したデータ
     private var receiveExchangeDataWrapper = ExchangeDataWrapper()
-    
+
     /// 変更を検知して発火させる
     private var cancellable: AnyCancellable?
-    
-    var mcPeerIDUUIDWrapper = MCPeerIDUUIDWrapper()
+
+    /// Peer 情報 — AppModel のものを参照する
+    var mcPeerIDUUIDWrapper: MCPeerIDUUIDWrapper!
     
     private let jsonDecoder = JSONDecoder()
     private let jsonEncoder = JSONEncoder()
@@ -206,10 +207,9 @@ class RPCModel: ObservableObject {
     /// リクエストキュー（再送管理用）
     private let requestQueue = RequestQueue()
     
-    init(sendExchangeDataWrapper: ExchangeDataWrapper, receiveExchangeDataWrapper: ExchangeDataWrapper, mcPeerIDUUIDWrapper: MCPeerIDUUIDWrapper) {
+    init(sendExchangeDataWrapper: ExchangeDataWrapper, receiveExchangeDataWrapper: ExchangeDataWrapper) {
         self.sendExchangeDataWrapper = sendExchangeDataWrapper
         self.receiveExchangeDataWrapper = receiveExchangeDataWrapper
-        self.mcPeerIDUUIDWrapper = mcPeerIDUUIDWrapper
         cancellable = receiveExchangeDataWrapper.$exchangeData.sink { [weak self] exchangeData in
             self?.receiveExchangeDataDidChange(exchangeData)
         }

@@ -23,7 +23,9 @@ struct TransformationMatrixPreparationView: View {
     var body: some View {
         VStack {
             HStack{
-                Text("MyId:\(rpcModel.mcPeerIDUUIDWrapper.mine.displayName)").font(.title)
+                let myId = rpcModel.mcPeerIDUUIDWrapper.mine.displayName
+                let wrapperAddr = String(format: "%p", UInt(bitPattern: ObjectIdentifier(rpcModel.mcPeerIDUUIDWrapper)))
+                Text("MyId:\(myId) | wrapper:\(wrapperAddr)").font(.title)
                 Text(time)
             }
             Divider()

@@ -11,14 +11,28 @@ struct SelectingPeerView: View {
     @ObservedObject private var rpcModel: RPCModel
     @State var peerIDHash: Int!
     @State private var errorMessage: String = ""
-    
+
     init(rpcModel: RPCModel) {
         self.rpcModel = rpcModel
     }
-    
+
     var body: some View {
         VStack {
             Text("2. 近くにいる人を選択").font(.title)
+
+            // デバッグ用情報
+            let standbyCount = rpcModel.mcPeerIDUUIDWrapper.standby.count
+            let wrapperPtr = String(format: "%p", UInt(bitPattern: ObjectIdentifier(rpcModel.mcPeerIDUUIDWrapper)))
+
+            Text("🔍 standby: \(standbyCount) | wrapper: \(wrapperPtr)")
+                .font(.caption)
+                .foregroundColor(.gray)
+
+            ForEach(rpcModel.mcPeerIDUUIDWrapper.standby, id: \.id) { peerId in
+                Text("\(peerId.displayName) [hash=\(peerId.hash)]")
+                    .font(.caption)
+            }
+
             Divider()
             Picker("", selection: $peerIDHash) {
                 Text("選ぶ").tag(nil as Int?)

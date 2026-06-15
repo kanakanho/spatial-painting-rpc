@@ -9,7 +9,7 @@ import SwiftUI
 
 @main
 struct spatial_painting_rpcApp: App {
-    @ObservedObject private var appModel = AppModel()
+    @StateObject private var appModel = AppModel()
     
     var body: some Scene {
         WindowGroup {

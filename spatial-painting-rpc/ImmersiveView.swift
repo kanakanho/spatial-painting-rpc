@@ -18,6 +18,8 @@ struct ImmersiveView: View {
     @Environment(\.openWindow) private var openWindow: OpenWindowAction
     @Environment(\.dismissWindow) private var dismissWindow: DismissWindowAction
     @Environment(\.displayScale) private var displayScale: CGFloat
+
+    @State private var peerManager: PeerManager?
     
     // added by nagao 2025/12/31
     @State var stylusManager: StylusManager
@@ -134,14 +136,30 @@ struct ImmersiveView: View {
                 print("Error in RealityView's make: \(error)")
             }
         }
+        .onAppear {
+            let manager = PeerManager(
+                sendExchangeDataWrapper: appModel.sendExchangeDataWrapper,
+                receiveExchangeDataWrapper: appModel.receiveExchangeDataWrapper,
+                mcPeerIDUUIDWrapper: appModel.mcPeerIDUUIDWrapper
+            )
+            self.peerManager = manager
+            peerManager?.start()
+        }
+        .onDisappear {
+            peerManager?.stop()
+            peerManager = nil
+            appModel.mcPeerIDUUIDWrapper.standby.removeAll()
+        }
         /// ARKitSession の起動
         .task {
+            #if !targetEnvironment(simulator)
             do {
                 try await appModel.model.session.run([appModel.model.sceneReconstruction, appModel.model.handTracking])
             } catch {
                 print("Failed to start session: \(error)")
                 await dismissImmersiveSpace()
             }
+            #endif
         }
         /// ハンドトラッキングの処理を起動
         .task {

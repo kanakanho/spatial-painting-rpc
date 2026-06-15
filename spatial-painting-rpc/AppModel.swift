@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 /// Maintains app-wide state
 @MainActor
@@ -22,27 +23,30 @@ class AppModel: ObservableObject {
     
     @ObservedObject var sendExchangeDataWrapper = ExchangeDataWrapper()
     @ObservedObject var receiveExchangeDataWrapper = ExchangeDataWrapper()
-    @ObservedObject var mcPeerIDUUIDWrapper = MCPeerIDUUIDWrapper()
+    var mcPeerIDUUIDWrapper = MCPeerIDUUIDWrapper()
     @ObservedObject var rpcModel: RPCModel
-    var peerManager: PeerManager
+    private var cancellables = Set<AnyCancellable>()
     var externalStrokeFileWapper: ExternalStrokeFileWapper = ExternalStrokeFileWapper()
     
     init() {
         let sendExchangeDataWrapper = ExchangeDataWrapper()
         let receiveExchangeDataWrapper = ExchangeDataWrapper()
-        let mcPeerIDUUIDWrapper = MCPeerIDUUIDWrapper()
-        
-        let rpcModel = RPCModel(sendExchangeDataWrapper: sendExchangeDataWrapper, receiveExchangeDataWrapper: receiveExchangeDataWrapper, mcPeerIDUUIDWrapper: mcPeerIDUUIDWrapper)
-        
+
         self.sendExchangeDataWrapper = sendExchangeDataWrapper
         self.receiveExchangeDataWrapper = receiveExchangeDataWrapper
+
+        let mcPeerIDUUIDWrapper = MCPeerIDUUIDWrapper()
+        self.rpcModel = RPCModel(sendExchangeDataWrapper: sendExchangeDataWrapper, receiveExchangeDataWrapper: receiveExchangeDataWrapper)
+        // AppModel と RPCModel で同じ wrapper を共有
+        self.rpcModel.mcPeerIDUUIDWrapper = mcPeerIDUUIDWrapper
         self.mcPeerIDUUIDWrapper = mcPeerIDUUIDWrapper
         
-        self.rpcModel = rpcModel
-        self.peerManager = PeerManager(
-            sendExchangeDataWrapper: sendExchangeDataWrapper,
-            receiveExchangeDataWrapper: receiveExchangeDataWrapper,
-            mcPeerIDUUIDWrapper: mcPeerIDUUIDWrapper
-        )
+        // 子の通知を、親（AppModel）の通知として外に流す
+        mcPeerIDUUIDWrapper.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 }
