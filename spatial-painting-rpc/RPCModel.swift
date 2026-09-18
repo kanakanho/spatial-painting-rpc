@@ -207,6 +207,9 @@ class RPCModel: ObservableObject {
     /// リクエストキュー（再送管理用）
     private let requestQueue = RequestQueue()
     
+    /// 送受信した RPC リクエストのロガー
+    private let logger = RPCLogger()
+    
     init(sendExchangeDataWrapper: ExchangeDataWrapper, receiveExchangeDataWrapper: ExchangeDataWrapper) {
         self.sendExchangeDataWrapper = sendExchangeDataWrapper
         self.receiveExchangeDataWrapper = receiveExchangeDataWrapper
@@ -226,7 +229,47 @@ class RPCModel: ObservableObject {
             return
         }
         
+        logger.log(
+            direction: .receive,
+            request: request,
+            from: request.peerId,
+            fromUUID: peerUUID(forHash: request.peerId),
+            to: mcPeerIDUUIDWrapper.mine.hash,
+            toUUID: mcPeerIDUUIDWrapper.myId
+        )
+        
         _ = receiveRequest(request)
+    }
+    
+    /// Peer の hash から UUID を取得する（自身を含む）
+    private func peerUUID(forHash hash: Int) -> UUID? {
+        if hash == mcPeerIDUUIDWrapper.mine.hash {
+            return mcPeerIDUUIDWrapper.myId
+        }
+        return mcPeerIDUUIDWrapper.peerId(forHash: hash)
+    }
+    
+    /// エンコード済みのリクエストを送信し、ログに記録する
+    /// - Parameters:
+    ///     - request: 送信する `RequestSchema`
+    ///     - data: `request` をエンコードしたデータ
+    ///     - peer: 送信先の Peer の hash（nil の場合は全ピアに送信）
+    ///     - direction: ログに記録する通信方向
+    private func transmit(_ request: RequestSchema, data: Data, to peer: Int?, direction: RPCLogDirection = .send) {
+        logger.log(
+            direction: direction,
+            request: request,
+            from: mcPeerIDUUIDWrapper.mine.hash,
+            fromUUID: mcPeerIDUUIDWrapper.myId,
+            to: peer,
+            toUUID: peer.flatMap { peerUUID(forHash: $0) }
+        )
+        
+        if let peer {
+            sendExchangeDataWrapper.setData(data, to: peer)
+        } else {
+            sendExchangeDataWrapper.setData(data)
+        }
     }
     
     @Published var coordinateTransforms = CoordinateTransforms()
@@ -299,7 +342,7 @@ class RPCModel: ObservableObject {
             requestQueue.enqueue(request)
         }
         
-        sendExchangeDataWrapper.setData(requestData)
+        transmit(request, data: requestData, to: nil)
         return rpcResult
     }
     
@@ -352,7 +395,7 @@ class RPCModel: ObservableObject {
             requestQueue.enqueue(request)
         }
         
-        sendExchangeDataWrapper.setData(requestData, to: mcPeerId)
+        transmit(request, data: requestData, to: mcPeerId)
         return rpcResult
     }
     
@@ -427,7 +470,7 @@ class RPCModel: ObservableObject {
         guard let requestData = try? JSONEncoder().encode(request) else {
             return RPCResult("\"\(message)\" is not send Peer")
         }
-        sendExchangeDataWrapper.setData(requestData, to: peerId)
+        transmit(request, data: requestData, to: peerId)
         return RPCResult(message)
     }
     
@@ -447,7 +490,7 @@ class RPCModel: ObservableObject {
             return
         }
         
-        sendExchangeDataWrapper.setData(requestData, to: peerId)
+        transmit(ackRequest, data: requestData, to: peerId)
     }
     
     /// リクエストを再送信
@@ -461,10 +504,10 @@ class RPCModel: ObservableObject {
         // リクエストの送信先に応じて送信
         // mcPeerIdが0でない場合は特定のピアに送信
         if let peerID = mcPeerIDUUIDWrapper.standby.first(where: { $0.hash == request.peerId }) {
-            sendExchangeDataWrapper.setData(requestData, to: peerID.hash)
+            transmit(request, data: requestData, to: peerID.hash, direction: .resend)
         } else {
             // 該当するピアが見つからない場合は全ピアに送信
-            sendExchangeDataWrapper.setData(requestData)
+            transmit(request, data: requestData, to: nil, direction: .resend)
         }
     }
 }

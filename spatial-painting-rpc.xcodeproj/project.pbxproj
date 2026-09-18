@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		EB227F132DD1B80D00ED8411 /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = EB227F122DD1B80D00ED8411 /* RealityKitContent */; settings = {ATTRIBUTES = (Required, ); }; };
+		EBBBB88F2F34A0F90077301E /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = EBBBB88E2F34A0F90077301E /* GRDB */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -58,6 +59,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				EB227F132DD1B80D00ED8411 /* RealityKitContent in Frameworks */,
+				EBBBB88F2F34A0F90077301E /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,6 +121,7 @@
 			name = "spatial-painting-rpc";
 			packageProductDependencies = (
 				EB227F122DD1B80D00ED8411 /* RealityKitContent */,
+				EBBBB88E2F34A0F90077301E /* GRDB */,
 			);
 			productName = "spatial-painting-rpc";
 			productReference = EB227F0D2DD1B80D00ED8411 /* spatial-painting-rpc.app */;
@@ -177,6 +180,7 @@
 			mainGroup = EB227F042DD1B80D00ED8411;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				EBBBB88D2F34A0F90077301E /* XCRemoteSwiftPackageReference "GRDB" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EB227F0E2DD1B80D00ED8411 /* Products */;
@@ -361,6 +365,7 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
 				XROS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Debug;
@@ -419,6 +424,7 @@
 				SDKROOT = xros;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_STRICT_CONCURRENCY = complete;
 				VALIDATE_PRODUCT = YES;
 				XROS_DEPLOYMENT_TARGET = 2.0;
 			};
@@ -494,10 +500,26 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		EBBBB88D2F34A0F90077301E /* XCRemoteSwiftPackageReference "GRDB" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		EB227F122DD1B80D00ED8411 /* RealityKitContent */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = RealityKitContent;
+		};
+		EBBBB88E2F34A0F90077301E /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EBBBB88D2F34A0F90077301E /* XCRemoteSwiftPackageReference "GRDB" */;
+			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
