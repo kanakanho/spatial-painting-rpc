@@ -7,7 +7,7 @@
 
 import RealityKit
 import CoreHaptics
-import GameController
+@preconcurrency import GameController
 
 @Observable
 @MainActor
@@ -161,7 +161,7 @@ final class StylusManager {
         
         input.inputStateQueueDepth = 1
         input.inputStateAvailableHandler = { input in
-            while let nextState = input.nextInputState() {
+            while input.nextInputState() != nil {
                 if let primary = input.buttons[.stylusPrimaryButton],
                    primary.pressedInput.isPressed {
                     print("✏️[PrimaryButton] pressed")

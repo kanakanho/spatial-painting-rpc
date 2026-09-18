@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct PeerIdentity: Hashable {
+struct PeerIdentity: Hashable, Sendable {
     let id: UUID
     let displayName: String
 
@@ -22,6 +22,7 @@ struct PeerIdentity: Hashable {
 }
 
 /// 各端末の接続状況を管理するラッパー
+@MainActor
 class MCPeerIDUUIDWrapper: ObservableObject {
     /// 自身の id
     let myId: UUID
@@ -49,7 +50,7 @@ class MCPeerIDUUIDWrapper: ObservableObject {
         standby.removeAll { $0.id == peerId }
     }
 
-    static func stableHash(for uuid: UUID) -> Int {
+    nonisolated static func stableHash(for uuid: UUID) -> Int {
         var bytes = uuid.uuid
         let value = withUnsafeBytes(of: &bytes) { raw -> UInt64 in
             var result: UInt64 = 0

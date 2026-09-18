@@ -21,25 +21,19 @@ class AppModel: ObservableObject {
     
     var model = ViewModel()
     
-    @ObservedObject var sendExchangeDataWrapper = ExchangeDataWrapper()
-    @ObservedObject var receiveExchangeDataWrapper = ExchangeDataWrapper()
-    var mcPeerIDUUIDWrapper = MCPeerIDUUIDWrapper()
+    let mcPeerIDUUIDWrapper: MCPeerIDUUIDWrapper
     @ObservedObject var rpcModel: RPCModel
     private var cancellables = Set<AnyCancellable>()
     var externalStrokeFileWapper: ExternalStrokeFileWapper = ExternalStrokeFileWapper()
     
     init() {
-        let sendExchangeDataWrapper = ExchangeDataWrapper()
-        let receiveExchangeDataWrapper = ExchangeDataWrapper()
-
-        self.sendExchangeDataWrapper = sendExchangeDataWrapper
-        self.receiveExchangeDataWrapper = receiveExchangeDataWrapper
-
         let mcPeerIDUUIDWrapper = MCPeerIDUUIDWrapper()
-        self.rpcModel = RPCModel(sendExchangeDataWrapper: sendExchangeDataWrapper, receiveExchangeDataWrapper: receiveExchangeDataWrapper)
         // AppModel と RPCModel で同じ wrapper を共有
-        self.rpcModel.mcPeerIDUUIDWrapper = mcPeerIDUUIDWrapper
         self.mcPeerIDUUIDWrapper = mcPeerIDUUIDWrapper
+        self.rpcModel = RPCModel(
+            transport: RPCTransport(localPeerId: mcPeerIDUUIDWrapper.myId),
+            mcPeerIDUUIDWrapper: mcPeerIDUUIDWrapper
+        )
         
         // 子の通知を、親（AppModel）の通知として外に流す
         mcPeerIDUUIDWrapper.objectWillChange

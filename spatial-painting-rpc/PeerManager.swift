@@ -5,22 +5,21 @@
 //  Created by blueken on 2024/12/02.
 //
 
-import Combine
 import Foundation
 import Network
+import Synchronization
 
+@MainActor
 @Observable
 final class PeerManager {
     private let networkManager: RPCNetworkManager
 
     init(
-        sendExchangeDataWrapper: ExchangeDataWrapper,
-        receiveExchangeDataWrapper: ExchangeDataWrapper,
+        transport: RPCTransport,
         mcPeerIDUUIDWrapper: MCPeerIDUUIDWrapper
     ) {
         self.networkManager = RPCNetworkManager(
-            sendExchangeDataWrapper: sendExchangeDataWrapper,
-            receiveExchangeDataWrapper: receiveExchangeDataWrapper,
+            transport: transport,
             peerDirectory: mcPeerIDUUIDWrapper,
             serviceType: "painting-rpc"
         )
@@ -37,38 +36,34 @@ final class PeerManager {
 
 // MARK: - Network.framework + Bonjour (based on ImmersiveRPCKit/Network)
 
+@MainActor
 final class RPCNetworkManager {
-    private let sendExchangeDataWrapper: ExchangeDataWrapper
-    private let receiveExchangeDataWrapper: ExchangeDataWrapper
-    private let peerDirectory: MCPeerIDUUIDWrapper
-    private var cancellable: AnyCancellable?
+    private let transport: RPCTransport
 
     private let topologyManager: NetworkTopologyManager
     private let server: RPCServer
     private let browser: RPCBrowser
 
     init(
-        sendExchangeDataWrapper: ExchangeDataWrapper,
-        receiveExchangeDataWrapper: ExchangeDataWrapper,
+        transport: RPCTransport,
         peerDirectory: MCPeerIDUUIDWrapper,
         serviceType: String
     ) {
-        self.sendExchangeDataWrapper = sendExchangeDataWrapper
-        self.receiveExchangeDataWrapper = receiveExchangeDataWrapper
-        self.peerDirectory = peerDirectory
+        self.transport = transport
 
         let topology = NetworkTopologyManager(
-            localPeerId: peerDirectory.myId,
+            localPeerId: transport.localPeerId,
             onRoleChanged: nil,
-            onPeersChanged: { [weak peerDirectory] peerIds in
-                Task {
+            onPeersChanged: { [weak transport, weak peerDirectory] peerIds in
+                transport?.updateConnectedPeers(peerIds)
+                // @Published の更新はメインスレッドで行う
+                Task { @MainActor in
                     peerDirectory?.setConnectedPeerIds(peerIds)
                 }
             },
-            onReceiveData: { [weak receiveExchangeDataWrapper] data in
-                Task {
-                    receiveExchangeDataWrapper?.setData(data)
-                }
+            onReceiveData: { [weak transport] data in
+                // 受信した順番に渡す（デコードは RPCTransport が MainActor の外で行う）
+                transport?.receive(data)
             }
         )
         self.topologyManager = topology
@@ -76,17 +71,14 @@ final class RPCNetworkManager {
         self.server = RPCServer(
             topologyManager: topology,
             serviceType: serviceType,
-            localPeerId: peerDirectory.myId,
+            localPeerId: transport.localPeerId,
             localPriority: topology.localPriority
         )
         self.browser = RPCBrowser(topologyManager: topology, serviceType: serviceType)
-
-        cancellable = sendExchangeDataWrapper.$exchangeData.sink { [weak self] exchangeData in
-            self?.sendExchangeDataDidChange(exchangeData)
-        }
     }
 
     func start() {
+        transport.attach(topologyManager)
         do {
             try server.start()
         } catch {
@@ -98,41 +90,53 @@ final class RPCNetworkManager {
     func stop() {
         server.stop()
         browser.stop()
-    }
-
-    private func sendExchangeDataDidChange(_ exchangeData: ExchangeData) {
-        if exchangeData.mcPeerId != 0 {
-            guard let peerId = peerDirectory.peerId(forHash: exchangeData.mcPeerId) else {
-                print("RPCNetworkManager: target peer not found for hash \(exchangeData.mcPeerId)")
-                return
-            }
-            Task {
-                await topologyManager.send(data: exchangeData.data, to: peerId)
-            }
-        } else {
-            Task {
-                await topologyManager.send(data: exchangeData.data, to: nil)
-            }
-        }
+        transport.detach()
     }
 }
 
+/// 1本の TCP 接続
+///
+/// - Note: 接続した側（outbound）は最初に自身の peerId を hello として送る。
+///   受け付けた側（inbound）は相手の endpoint が Bonjour のサービス名ではなく ip:port になるため、
+///   hello を受け取るまで相手を特定できない。
 final class RPCConnection: @unchecked Sendable {
+    /// hello フレームの先頭に付ける識別子
+    private static let helloPrefix = Data("PAINTING-RPC-HELLO:".utf8)
+
     private let connection: NWConnection
     private let topologyManager: NetworkTopologyManager
     private let endpoint: NWEndpoint
+    /// 接続した側かどうか（hello を送る側）
+    private let isOutbound: Bool
 
-    private var peerId: UUID?
+    private let peerId: Mutex<UUID?>
+    /// 受信したフレームを受信した順番に処理するためのストリーム
+    private let incomingContinuation: AsyncStream<Data>.Continuation
 
     init(connection: NWConnection, peerId: UUID?, topologyManager: NetworkTopologyManager) {
         self.connection = connection
-        self.peerId = peerId
+        self.peerId = Mutex(peerId)
+        self.isOutbound = peerId != nil
         self.topologyManager = topologyManager
         self.endpoint = connection.endpoint
+
+        let (incoming, incomingContinuation) = AsyncStream.makeStream(of: Data.self)
+        self.incomingContinuation = incomingContinuation
+
+        Task { [weak self] in
+            for await payload in incoming {
+                guard let self else { return }
+                await self.handle(payload: payload)
+            }
+        }
+    }
+
+    deinit {
+        incomingContinuation.finish()
     }
 
     func setPeerId(_ peerId: UUID) {
-        self.peerId = peerId
+        self.peerId.withLock { $0 = peerId }
     }
 
     func start() {
@@ -147,14 +151,21 @@ final class RPCConnection: @unchecked Sendable {
             }
         }
         connection.start(queue: .global(qos: .userInitiated))
+
+        // 他のデータより先に届くように、start と同じ呼び出しの中で hello を積む
+        if isOutbound {
+            let hello = Self.helloPrefix + Data(topologyManager.localPeerId.uuidString.utf8)
+            connection.send(content: Self.frame(hello), completion: .contentProcessed { error in
+                if let error {
+                    print("RPCConnection: failed to send hello: \(error)")
+                }
+            })
+        }
     }
 
     /// メッセージ送信（4バイトの長さヘッダーを付与して Big Endian パッキング）
     func send(data: Data) async throws {
-        var packet = Data()
-        var length = UInt32(data.count).bigEndian
-        withUnsafeBytes(of: &length) { packet.append(contentsOf: $0) }
-        packet.append(data)
+        let packet = Self.frame(data)
 
         return try await withCheckedThrowingContinuation { continuation in
             connection.send(content: packet, completion: .contentProcessed { error in
@@ -165,6 +176,15 @@ final class RPCConnection: @unchecked Sendable {
                 }
             })
         }
+    }
+
+    /// 4バイトの長さヘッダーを付与する
+    private static func frame(_ data: Data) -> Data {
+        var packet = Data()
+        var length = UInt32(data.count).bigEndian
+        withUnsafeBytes(of: &length) { packet.append(contentsOf: $0) }
+        packet.append(data)
+        return packet
     }
 
     private func startReceiveLoop() {
@@ -189,17 +209,32 @@ final class RPCConnection: @unchecked Sendable {
                     return
                 }
 
-                Task {
-                    await self.topologyManager.handleIncoming(data: payload, from: self.peerId)
-                }
+                self.incomingContinuation.yield(payload)
 
                 self.startReceiveLoop()
             }
         }
     }
 
+    /// 受信したフレームを処理する（受信した順番に呼ばれる）
+    private func handle(payload: Data) async {
+        if payload.starts(with: Self.helloPrefix) {
+            let idString = String(decoding: payload.dropFirst(Self.helloPrefix.count), as: UTF8.self)
+            guard let remotePeerId = UUID(uuidString: idString) else {
+                print("RPCConnection: invalid hello: \(idString)")
+                return
+            }
+            setPeerId(remotePeerId)
+            await topologyManager.identifyInboundConnection(self, peerId: remotePeerId)
+            return
+        }
+
+        await topologyManager.handleIncoming(data: payload, from: peerId.withLock { $0 })
+    }
+
     private func handleFailure() {
         connection.cancel()
+        let peerId = self.peerId.withLock { $0 }
         Task {
             await topologyManager.handleDisconnect(peerId: peerId, endpoint: endpoint)
         }
@@ -407,15 +442,15 @@ actor NetworkTopologyManager {
 
     private var isMasterHost: Bool = true
 
-    private var onRoleChanged: ((Bool) -> Void)?
-    private var onPeersChanged: (([UUID]) -> Void)?
-    private var onReceiveData: ((Data) -> Void)?
+    private let onRoleChanged: (@Sendable (Bool) -> Void)?
+    private let onPeersChanged: (@Sendable ([UUID]) -> Void)?
+    private let onReceiveData: (@Sendable (Data) -> Void)?
 
     init(
         localPeerId: UUID = UUID(),
-        onRoleChanged: ((Bool) -> Void)? = nil,
-        onPeersChanged: (([UUID]) -> Void)? = nil,
-        onReceiveData: ((Data) -> Void)? = nil
+        onRoleChanged: (@Sendable (Bool) -> Void)? = nil,
+        onPeersChanged: (@Sendable ([UUID]) -> Void)? = nil,
+        onReceiveData: (@Sendable (Data) -> Void)? = nil
     ) {
         self.localPeerId = localPeerId
         self.localPriority = Self.priority(from: localPeerId)
@@ -445,15 +480,6 @@ actor NetworkTopologyManager {
 
         if let pending = pendingInboundConnections.removeValue(forKey: endpoint) {
             registerInboundConnection(pending, peerId: id)
-        } else if pendingInboundConnections.count == 1,
-            inboundConnections[id] == nil,
-            outboundConnections[id] == nil
-        {
-            let pending = pendingInboundConnections.values.first
-            pendingInboundConnections.removeAll()
-            if let pending {
-                registerInboundConnection(pending, peerId: id)
-            }
         }
 
         evaluateTopology(targetEndpoint: endpoint, targetPeerId: id)
@@ -463,6 +489,14 @@ actor NetworkTopologyManager {
         inboundConnections[peerId] = rpcConnection
         rpcConnection.setPeerId(peerId)
         notifyPeersChanged()
+    }
+
+    /// hello を受け取って相手が特定できた inbound 接続を登録する
+    func identifyInboundConnection(_ rpcConnection: RPCConnection, peerId: UUID) {
+        pendingInboundConnections = pendingInboundConnections.filter { $0.value !== rpcConnection }
+        // 相手から接続されているので、自分から接続する必要はない
+        guard outboundConnections[peerId] == nil else { return }
+        registerInboundConnection(rpcConnection, peerId: peerId)
     }
 
     func registerInboundConnection(_ rpcConnection: RPCConnection, endpoint: NWEndpoint) {

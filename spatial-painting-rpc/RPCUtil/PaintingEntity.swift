@@ -39,7 +39,7 @@ class Painting:ObservableObject {
     }
     
     func addBezierStrokePoints(param: AddBezierStrokePointsParam) {
-        paintingCanvas.addBezierStrokePoints(userId: param.userId, bezierPoints: param.bezierPoints)
+        paintingCanvas.addBezierStrokePoints(userId: param.userId, bezierPoints: param.bezierPoints.map { BezierStroke.BezierPoint(data: $0) })
     }
     
     /// ストロークを終了する
@@ -49,7 +49,7 @@ class Painting:ObservableObject {
     
     /// 複数のストロークを追加する
     func addBezierStrokes(param: AddBezierStrokesParam) {
-        paintingCanvas.addBezierStrokes(param.strokes)
+        paintingCanvas.addBezierStrokes(param.strokes.map { BezierStroke(data: $0) })
     }
     
     /// 線の太さを変更する
@@ -128,12 +128,12 @@ struct PaintingEntity: RPCEntity {
         }
         
         struct AddBezierStrokesParam: Codable {
-            let strokes: [BezierStroke]
+            let strokes: [BezierStrokeData]
         }
         
         struct AddBezierStrokePointsParam: Codable {
             let userId: UUID
-            let bezierPoints: [BezierStroke.BezierPoint]
+            let bezierPoints: [BezierPointData]
         }
         
         struct FinishStrokeParam: Codable {

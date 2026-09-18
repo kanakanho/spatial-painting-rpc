@@ -16,8 +16,9 @@ struct IndividualStroke {
     var maxRadius: Float = 1E-2
 }
 
-@Observable
 /// A class that stores each stroke and generates a mesh, in real time, from a person's gesture movement.
+@MainActor
+@Observable
 class PaintingCanvas {
     /// The main root entity for the painting canvas.
     let root = Entity()

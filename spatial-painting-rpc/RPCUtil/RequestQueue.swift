@@ -6,131 +6,102 @@
 //
 
 import Foundation
+import Synchronization
+
+/// RPC リクエストの送信先
+enum RPCDestination: Sendable, Equatable {
+    /// 全ての Peer に送信
+    case broadcast
+    /// 特定の Peer に送信（Peer の hash）
+    case peer(Int)
+}
 
 /// A single queued request with retry tracking
-struct QueuedRequest {
+struct QueuedRequest: Sendable {
     let request: RequestSchema
+    let destination: RPCDestination
     var timestamp: Date
     var retryCount: Int
     let maxRetries: Int
-    
+
     var shouldRetry: Bool {
         return retryCount < maxRetries
     }
 }
 
 /// Thread-safe queue for managing pending RPC requests with retry logic
-@MainActor
-class RequestQueue: ObservableObject {
+///
+/// - Note: 再送のタイミングの管理は呼び出し側（`RPCTransport`）が `takeRequestsToRetry()` を定期的に呼んで行う
+final class RequestQueue: Sendable {
     /// Dictionary of pending requests keyed by request ID
-    private var pendingRequests: [UUID: QueuedRequest] = [:]
-    
+    private let pendingRequests = Mutex<[UUID: QueuedRequest]>([:])
+
     /// Timeout duration for requests
-    private let timeout: TimeInterval
-    
+    let timeout: TimeInterval
+
     /// Maximum retry attempts
-    private let maxRetries: Int
-    
-    /// Timer for periodic retry checks
-    private var retryTimer: Timer?
-    
-    /// Callback for retrying requests
-    var onRetry: ((RequestSchema) -> Void)?
-    
+    let maxRetries: Int
+
     init(timeout: TimeInterval = 1.0, maxRetries: Int = 3) {
         self.timeout = timeout
         self.maxRetries = maxRetries
-        startRetryTimer()
     }
-    
-    deinit {
-        retryTimer?.invalidate()
-        retryTimer = nil
-    }
-    
+
     /// Add a request to the queue
-    func enqueue(_ request: RequestSchema) {
+    func enqueue(_ request: RequestSchema, destination: RPCDestination = .broadcast) {
         let queuedRequest = QueuedRequest(
             request: request,
+            destination: destination,
             timestamp: Date(),
             retryCount: 0,
             maxRetries: maxRetries
         )
-        pendingRequests[request.id] = queuedRequest
-//        print("Enqueued request \(request.id) for tracking")
+        pendingRequests.withLock { $0[request.id] = queuedRequest }
     }
-    
+
     /// Remove a request from the queue (called when ack is received)
     func dequeue(_ requestId: UUID) {
-        pendingRequests.removeValue(forKey: requestId)
-//        print("Dequeued request \(requestId) upon acknowledgment")
+        _ = pendingRequests.withLock { $0.removeValue(forKey: requestId) }
     }
-    
+
     /// Check if a request is in the queue
     func contains(_ requestId: UUID) -> Bool {
-        return pendingRequests[requestId] != nil
+        pendingRequests.withLock { $0[requestId] != nil }
     }
-    
+
     /// Get the number of pending requests
     var count: Int {
-        return pendingRequests.count
+        pendingRequests.withLock { $0.count }
     }
-    
-    /// Start the retry timer
-    private func startRetryTimer() {
-        retryTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.checkForRetries()
-            }
-        }
-    }
-    
-    /// Stop the retry timer
-    private func stopRetryTimer() {
-        retryTimer?.invalidate()
-        retryTimer = nil
-    }
-    
-    /// Check for requests that need to be retried
-    private func checkForRetries() {
-        let now = Date()
-        var requestsToRetry: [UUID] = []
-        var requestsToRemove: [UUID] = []
-        
-        for (id, queuedRequest) in pendingRequests {
-            let elapsed = now.timeIntervalSince(queuedRequest.timestamp)
-            
-            if elapsed >= timeout {
+
+    /// タイムアウトしたリクエストを取り出す
+    ///
+    /// 再送回数が上限に達したものはキューから削除し、それ以外は再送回数を増やして返す
+    /// - Parameter now: 現在時刻
+    /// - Returns: 再送するリクエスト
+    func takeRequestsToRetry(now: Date = Date()) -> [QueuedRequest] {
+        pendingRequests.withLock { pending in
+            var requestsToRetry: [QueuedRequest] = []
+
+            for (id, queuedRequest) in pending where now.timeIntervalSince(queuedRequest.timestamp) >= timeout {
                 if queuedRequest.shouldRetry {
-                    requestsToRetry.append(id)
+                    var retried = queuedRequest
+                    retried.retryCount += 1
+                    retried.timestamp = now
+                    pending[id] = retried
+                    requestsToRetry.append(retried)
                 } else {
                     // Max retries reached, remove from queue
-                    requestsToRemove.append(id)
-//                    print("Request \(id) max retries reached, removing from queue")
+                    pending.removeValue(forKey: id)
                 }
             }
-        }
-        
-        // Remove requests that have exceeded max retries
-        for id in requestsToRemove {
-            pendingRequests.removeValue(forKey: id)
-        }
-        
-        // Retry requests that have timed out
-        for id in requestsToRetry {
-            if var queuedRequest = pendingRequests[id] {
-                queuedRequest.retryCount += 1
-                queuedRequest.timestamp = now
-                pendingRequests[id] = queuedRequest
-                
-                print("Retrying Request \(id) (\(queuedRequest.retryCount)/\(maxRetries)) \(queuedRequest.request.method)")
-                onRetry?(queuedRequest.request)
-            }
+
+            return requestsToRetry
         }
     }
-    
+
     /// Clear all pending requests
     func clear() {
-        pendingRequests.removeAll()
+        pendingRequests.withLock { $0.removeAll() }
     }
 }

@@ -169,6 +169,7 @@ extension [[Float]] {
 //    }
 //}
 
+@MainActor
 extension Array where Element == BezierStroke {
     /// point が count 以下のストロークを取り除いた配列を返す
     func removingShortStrokes(minPoints: Int = 3) -> [BezierStroke] {

@@ -9,11 +9,14 @@ import SwiftUI
 
 struct SelectingPeerView: View {
     @ObservedObject private var rpcModel: RPCModel
+    /// Peer の一覧は RPCModel ではなくこちらの変更で更新する
+    @ObservedObject private var peerDirectory: MCPeerIDUUIDWrapper
     @State var peerIDHash: Int!
     @State private var errorMessage: String = ""
 
     init(rpcModel: RPCModel) {
         self.rpcModel = rpcModel
+        self.peerDirectory = rpcModel.mcPeerIDUUIDWrapper
     }
 
     var body: some View {
@@ -21,14 +24,14 @@ struct SelectingPeerView: View {
             Text("2. 近くにいる人を選択").font(.title)
 
             // デバッグ用情報
-            let standbyCount = rpcModel.mcPeerIDUUIDWrapper.standby.count
-            let wrapperPtr = String(format: "%p", UInt(bitPattern: ObjectIdentifier(rpcModel.mcPeerIDUUIDWrapper)))
+            let standbyCount = peerDirectory.standby.count
+            let wrapperPtr = String(format: "%p", UInt(bitPattern: ObjectIdentifier(peerDirectory)))
 
             Text("🔍 standby: \(standbyCount) | wrapper: \(wrapperPtr)")
                 .font(.caption)
                 .foregroundColor(.gray)
 
-            ForEach(rpcModel.mcPeerIDUUIDWrapper.standby, id: \.id) { peerId in
+            ForEach(peerDirectory.standby, id: \.id) { peerId in
                 Text("\(peerId.displayName) [hash=\(peerId.hash)]")
                     .font(.caption)
             }
@@ -36,7 +39,7 @@ struct SelectingPeerView: View {
             Divider()
             Picker("", selection: $peerIDHash) {
                 Text("選ぶ").tag(nil as Int?)
-                ForEach(rpcModel.mcPeerIDUUIDWrapper.standby, id: \.hash) { peerId in
+                ForEach(peerDirectory.standby, id: \.hash) { peerId in
                     Text(String(peerId.displayName)).tag(peerId.hash)
                 }
             }
@@ -70,7 +73,7 @@ struct SelectingPeerView: View {
             }
             
             // hash値が大きい方をホストとする
-            let nextState: TransformationMatrixPreparationState = rpcModel.mcPeerIDUUIDWrapper.mine.hash > peerIDHash ? .getTransformMatrixClient : .getTransformMatrixHost
+            let nextState: TransformationMatrixPreparationState = peerDirectory.mine.hash > peerIDHash ? .getTransformMatrixClient : .getTransformMatrixHost
             // 次の画面に遷移する
             let setStateRPCResult = rpcModel.coordinateTransforms.setState(param: .init(state: nextState))
             if !setStateRPCResult.success {

@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import Combine
 
 struct TransformationMatrixPreparationView: View {
     @ObservedObject private var rpcModel: RPCModel

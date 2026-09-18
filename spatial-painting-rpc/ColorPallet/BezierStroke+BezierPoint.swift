@@ -22,8 +22,9 @@ struct BezierStrokeControlComponent: Component {
 }
 
 extension BezierStroke {
-    final class BezierPoint: Codable {
-        enum PointType: CaseIterable, Codable {
+    @MainActor
+    final class BezierPoint {
+        enum PointType: CaseIterable, Codable, Sendable {
             case end
             case startControl
             case endControl
@@ -41,22 +42,19 @@ extension BezierStroke {
         }
         
         static let endShapeSize: Float = 0.02
-        static let endEntityMesh: MeshResource = .generateBox(size: BezierStroke.BezierPoint.endShapeSize)
         static let endEntityMaterial: SimpleMaterial = .init(color: .init(white: 1.0, alpha: 0.5), isMetallic: true)
         
         static let controlEntitySize: Float = 0.001
-        static let controlEntityMesh = MeshResource.generateBox(size: controlEntitySize)
         static let controlEntityMaterial = UnlitMaterial(color: .blue)
         
         static let handleEntityBoxSize: Float = 0.01
-        static let handleEntityMesh = MeshResource.generateSphere(radius: handleEntityBoxSize)
         static let handleEntityMaterial = UnlitMaterial(color: .blue)
         
         public var uuid: UUID = UUID()
         public let strokeId: UUID
         
         public var root: Entity = Entity()
-        var controlEntity: ModelEntity = ModelEntity(mesh: controlEntityMesh, materials: [controlEntityMaterial], collisionShape: .generateSphere(radius: controlEntitySize), mass: 0.0)
+        var controlEntity: ModelEntity
         var endEntity: Entity
         var startHandleEntity: Entity
         var endHandleEntity: Entity
@@ -95,6 +93,8 @@ extension BezierStroke {
             self.strokeId = strokeId
             self.uuid = pointId
             
+            controlEntity = ModelEntity(mesh: .generateBox(size: Self.controlEntitySize), materials: [Self.controlEntityMaterial])
+            
             endEntity = bezierEndPoint
             startHandleEntity = bezierHandle.clone(recursive: true)
             endHandleEntity = bezierHandle.clone(recursive: true)
@@ -116,6 +116,8 @@ extension BezierStroke {
         init(strokeId: UUID, pointId: UUID = UUID()) {
             self.strokeId = strokeId
             self.uuid = pointId
+            
+            controlEntity = ModelEntity(mesh: .generateBox(size: Self.controlEntitySize), materials: [Self.controlEntityMaterial])
             
             endEntity = ModelEntity()
             endHandleEntity = ModelEntity()
@@ -246,54 +248,23 @@ extension BezierStroke {
             updateDrawingControlPointMesh()
         }
         
-        func encode(to encoder: any Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(uuid, forKey: .uuid)
-            try container.encode(strokeId, forKey: .strokeId)
-            try container.encode(end, forKey: .end)
-            try container.encode(startControl, forKey: .startControl)
-            try container.encode(endControl, forKey: .endControl)
-        }
-        
-        required public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-                
-            self.uuid = try container.decode(UUID.self, forKey: .uuid)
-            self.strokeId = try container.decode(UUID.self, forKey: .strokeId)
-            self.end = try container.decodeIfPresent(SIMD3<Float>.self, forKey: .end)
-            self.startControl = try container.decodeIfPresent(SIMD3<Float>.self, forKey: .startControl)
-            self.endControl = try container.decodeIfPresent(SIMD3<Float>.self, forKey: .endControl)
-            
-            endEntity = ModelEntity()
-            startHandleEntity = ModelEntity()
-            endHandleEntity = ModelEntity()
-            
-            endEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
-            startHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
-            endHandleEntity.components.set(InputTargetComponent(allowedInputTypes: .all))
-            
-            endEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .end))
-            startHandleEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .startControl))
-            endHandleEntity.components.set(BezierStrokeControlComponent(bezierStrokeId: strokeId, bezierPointId: uuid, controlType: .endControl))
-            
-            root.addChild(endEntity)
-            root.addChild(controlEntity)
-            root.addChild(startHandleEntity)
-            root.addChild(endHandleEntity)
-            
+        /// 通信・ファイル保存用のデータから生成する
+        convenience init(data: BezierPointData) {
+            self.init(strokeId: data.strokeId, pointId: data.uuid)
+            self.end = data.end
+            self.startControl = data.startControl
+            self.endControl = data.endControl
             self.remesh()
         }
         
-        enum CodingKeys: String, CodingKey {
-            case uuid
-            case strokeId
-            case end
-            case startControl
-            case endControl
+        /// 通信・ファイル保存用のデータ
+        var data: BezierPointData {
+            BezierPointData(uuid: uuid, strokeId: strokeId, end: end, startControl: startControl, endControl: endControl)
         }
     }
 }
 
+@MainActor
 extension [BezierStroke.BezierPoint] {
     var beziers: [[SIMD3<Float>]] {
         var beziers: [[SIMD3<Float>]] = []
@@ -340,30 +311,16 @@ extension [BezierStroke.BezierPoint] {
         return nil
     }
     
-    func getPoints(affine: simd_float4x4) -> [BezierStroke.BezierPoint] {
-        return self.map { bezierPoint in
-            let newBezierPoint = BezierStroke.BezierPoint(strokeId: bezierPoint.strokeId, pointId: bezierPoint.uuid)
-            
-            if let end = bezierPoint.end {
-                newBezierPoint.end = matmul4x4_3x1(affine, end)
-            }
-            if let startControl = bezierPoint.startControl {
-                newBezierPoint.startControl = matmul4x4_3x1(affine, startControl)
-            }
-            if let endControl = bezierPoint.endControl {
-                newBezierPoint.endControl = matmul4x4_3x1(affine, endControl)
-            }
-            
-            newBezierPoint.remesh()
-            
-            return newBezierPoint
-        }
+    /// アフィン変換を適用した送信用のデータ
+    func transferData(affine: simd_float4x4) -> [BezierPointData] {
+        return self.map { $0.data.applying(affine) }
     }
 }
 
 extension [[SIMD3<Float>]] {
     /// ベジェのデータを `BezierStroke.BezierPoint` に変換する
     /// [firstPoint, ctrl1, ctrl2, lastPoint]
+    @MainActor
     func toBezierStrokeBezierPoint(strokeId: UUID, bezierEndPoint: Entity, bezierHandle: Entity) -> [BezierStroke.BezierPoint] {
         // 4点ない場合は消す
         if self.count < 3 {

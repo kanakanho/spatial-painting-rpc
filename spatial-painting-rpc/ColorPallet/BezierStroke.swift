@@ -27,8 +27,9 @@ struct StrokeRootComponent: Component {
 }
 
 
+@MainActor
 @Observable
-class BezierStroke: Codable {
+class BezierStroke {
     var uuid: UUID
     
     var activeColor: SimpleMaterial.Color = SimpleMaterial.Color.red
@@ -377,14 +378,6 @@ class BezierStroke: Codable {
         triangles.append(contentsOf: [quadIndices[3], quadIndices[1], quadIndices[0]])
     }
     
-    enum CodingKeys: String, CodingKey {
-        case uuid
-        case points
-        case activeColor
-        case maxRadius
-        case bezierPoints
-    }
-    
     // pointを変更しない
     public init(uuid: UUID, points: [SIMD3<Float>] = [], color: SimpleMaterial.Color = .white, maxRadius: Float = 1E-2) {
         self.uuid = uuid
@@ -408,49 +401,52 @@ class BezierStroke: Codable {
         root.addChild(stroke)
     }
     
-    required public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let pointArrays = try container.decode([[Float]].self, forKey: .points)
-        self.points = pointArrays.map { SIMD3<Float>($0) }
-        
-        // maxRadius の有無を確認
-        let hasMaxRadius = container.contains(.maxRadius)
-        let colorArray = try container.decode([Float].self, forKey: .activeColor)
-        guard colorArray.count == 4 else {
-            throw DecodingError.dataCorruptedError(forKey: .activeColor, in: container, debugDescription: "Color array must have 4 elements")
-        }
-        
-        if hasMaxRadius {
-            // HSVA（Hue, Saturation, Value, Alpha）
-            self.activeColor = .init(hue: CGFloat(colorArray[0]), saturation: CGFloat(colorArray[1]), brightness: CGFloat(colorArray[2]), alpha: CGFloat(colorArray[3]))
-        } else {
-            // RGBA（Red, Green, Blue, Alpha）
-            self.activeColor = .init(red: CGFloat(colorArray[0]), green: CGFloat(colorArray[1]), blue: CGFloat(colorArray[2]), alpha: CGFloat(colorArray[3]))
-        }
-        
-        self.maxRadius = try container.decodeIfPresent(Float.self, forKey: .maxRadius) ?? 1E-2
-        self.bezierPoints = try container.decodeIfPresent([BezierPoint].self, forKey: .bezierPoints) ?? []
-        let uuid = try container.decodeIfPresent(UUID.self, forKey: .uuid) ?? UUID()
-        self.uuid = uuid
-        self.tmpBezier = BezierPoint(strokeId: uuid)
-        stroke.components.set(StrokeComponent(uuid))
-        root.components.set(StrokeRootComponent(uuid))
-        root.addChild(stroke)
+    /// 通信・ファイル保存用のデータから生成する
+    convenience init(data: BezierStrokeData) {
+        self.init(uuid: data.uuid, points: data.points, color: data.color.uiColor, maxRadius: data.maxRadius)
+        self.bezierPoints = data.bezierPoints.map { BezierPoint(data: $0) }
     }
     
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(uuid, forKey: .uuid)
-        let pointArrays = points.map { [$0.x, $0.y, $0.z] }
-        try container.encode(pointArrays, forKey: .points)
+    /// 通信・ファイル保存用のデータ
+    var data: BezierStrokeData {
+        BezierStrokeData(
+            uuid: uuid,
+            points: points,
+            color: .init(activeColor),
+            maxRadius: maxRadius,
+            bezierPoints: bezierPoints.map(\.data)
+        )
+    }
+    
+    /// 座標変換を適用した送信用のデータ
+    ///
+    /// - Note: `points` には root の transform とアフィン変換を、`bezierPoints` にはアフィン変換のみを適用する
+    /// - Parameter affine: 送信先の座標系へのアフィン行列
+    func transferData(affine: simd_float4x4) -> BezierStrokeData {
+        let rootMatrix = root.transformMatrix(relativeTo: nil)
+        var data = self.data
+        data.points = points.map { matmul4x4_4x1(affine, rootMatrix * SIMD4<Float>($0, 1.0)) }
+        data.bezierPoints = data.bezierPoints.map { $0.applying(affine) }
+        return data
+    }
+}
+
+extension BezierStrokeData.ColorComponents {
+    init(_ color: UIColor) {
         var hue: CGFloat = 0.0
         var saturation: CGFloat = 0.0
         var brightness: CGFloat = 0.0
         var alpha: CGFloat = 0.0
-        activeColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        try container.encode([hue, saturation, brightness, alpha], forKey: .activeColor)
-        try container.encode(maxRadius, forKey: .maxRadius)
-        try container.encode(bezierPoints, forKey: .bezierPoints)
+        color.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        self = .hsba(SIMD4<Float>(Float(hue), Float(saturation), Float(brightness), Float(alpha)))
+    }
+    
+    var uiColor: UIColor {
+        switch self {
+        case .hsba(let c):
+            return UIColor(hue: CGFloat(c.x), saturation: CGFloat(c.y), brightness: CGFloat(c.z), alpha: CGFloat(c.w))
+        case .rgba(let c):
+            return UIColor(red: CGFloat(c.x), green: CGFloat(c.y), blue: CGFloat(c.z), alpha: CGFloat(c.w))
+        }
     }
 }
-

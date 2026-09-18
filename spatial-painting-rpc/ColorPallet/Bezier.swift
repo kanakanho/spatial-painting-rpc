@@ -101,6 +101,7 @@ func beziers2Points(beziers: [[SIMD3<Double>]]) -> [SIMD3<Double>] {
 }
 
 
+@MainActor
 func points2Beziers(strokeId: UUID, points: [SIMD3<Float>], bezierEndPoint: Entity, bezierHandle: Entity, max_error: Float = 0.0001) -> [BezierStroke.BezierPoint] {
     let fittedBeziers: [[SIMD3<Float>]] = BezierFitter.fitCurve(points: points, maxError: max_error)
     let bezierPoints: [BezierStroke.BezierPoint] = fittedBeziers.toBezierStrokeBezierPoint(strokeId: strokeId, bezierEndPoint: bezierEndPoint, bezierHandle: bezierHandle)
@@ -180,6 +181,7 @@ enum BezierPoint {
         return BoundingBoxCube(corners: corners)
     }
     
+    @MainActor
     var endPointMesh: MeshResource {
         return MeshResource.generateBox(
             width: endpointBoundingBoxCube.corners[.maxXMaxYMaxZ]!.x - endpointBoundingBoxCube.corners[.minXMinYMinZ]!.x,
@@ -188,6 +190,7 @@ enum BezierPoint {
         )
     }
     
+    @MainActor
     var innerMesh: MeshResource {
         return MeshResource.generateBox(
             width: innerBoundingBoxCube.corners[.maxXMaxYMaxZ]!.x - innerBoundingBoxCube.corners[.minXMinYMinZ]!.x,
@@ -196,6 +199,7 @@ enum BezierPoint {
         )
     }
     
+    @MainActor
     var endPoint2InnerMesh: MeshResource {
         // endPoint と inner を結んだ線分のメッシュ
         let corners: [BoundingBoxCube.Corner:SIMD3<Float>] = [

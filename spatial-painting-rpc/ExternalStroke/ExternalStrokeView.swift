@@ -104,18 +104,7 @@ struct ExternalStrokeView: View {
                 Button("Confirm Loaded Stroke") {
                     appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
                     for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                        let transformedStrokes: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: BezierStroke) in
-                            // points 全てにアフィン変換を適用
-                            let tmpRootTransfromPoints: [SIMD4<Float>] = stroke.points.map { (point: SIMD3<Float>) in
-                                return stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
-                            }
-                            let transformedPoints: [SIMD3<Float>] = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
-                                matmul4x4_4x1(affineMatrix, point)
-                            }
-                            let transformedStroke: BezierStroke = BezierStroke(uuid: stroke.uuid, points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
-                            transformedStroke.bezierPoints = stroke.bezierPoints.getPoints(affine: affineMatrix)
-                            return transformedStroke
-                        })
+                        let transformedStrokes: [BezierStrokeData] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map { $0.transferData(affine: affineMatrix) }
                         _ = appModel.rpcModel.sendRequest(
                             .init(
                                 peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,

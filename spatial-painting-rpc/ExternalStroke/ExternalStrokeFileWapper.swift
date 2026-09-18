@@ -10,6 +10,7 @@ import RealityKit
 import UIKit
 import ImageIO
 
+@MainActor
 @Observable
 class ExternalStrokeFileWapper {
     private let documentDirectory: URL
@@ -47,7 +48,7 @@ class ExternalStrokeFileWapper {
             let directoryURL = jsonFileURL.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true, attributes: nil)
             
-            let data = try encoder.encode(strokes)
+            let data = try encoder.encode(strokes.map(\.data))
             try data.write(to: jsonFileURL)
             print("File written to: \(jsonFileURL.path)")
             
@@ -250,8 +251,8 @@ class ExternalStrokeFileWapper {
             let jsonFileURL = fileDir.appendingPathComponent("\(dateStr)/strokes.json")
             let data = try Data(contentsOf: jsonFileURL)
             let decoder = JSONDecoder()
-            let strokes = try decoder.decode([BezierStroke].self, from: data)
-            return strokes
+            let strokes = try decoder.decode([BezierStrokeData].self, from: data)
+            return strokes.map { BezierStroke(data: $0) }
         }
         catch {
             print("Error reading JSON file: \(error)")

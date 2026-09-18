@@ -10,7 +10,7 @@ import simd
 import Combine
 
 /// PRC の Method として Entity を定義
-enum Method: Codable {
+enum Method: Codable, Sendable {
     case error(ErrorEntitiy.Method)
     case coordinateTransformEntity(CoordinateTransformEntity.Method)
     case paintingEntity(PaintingEntity.Method)
@@ -18,7 +18,7 @@ enum Method: Codable {
 }
 
 /// PRC の Param として Entity を定義
-enum Param: Codable {
+enum Param: Codable, Sendable {
     case error(ErrorEntitiy.Param)
     case coordinateTransformEntity(CoordinateTransformEntity.Param)
     case paintingEntity(PaintingEntity.Param)
@@ -65,7 +65,7 @@ enum Param: Codable {
 }
 
 /// 型安全な RequestSchema
-struct RequestSchema: Codable {
+struct RequestSchema: Codable, Sendable {
     /// 通信の一意な id
     let id: UUID
     /// 通信元の Peer の一意な id
@@ -166,7 +166,7 @@ struct RequestSchema: Codable {
 }
 
 /// RPC に関連するメソッドの共通の返り値
-struct RPCResult {
+struct RPCResult: Sendable {
     /// 成功したかどうか
     let success: Bool
     /// エラーメッセージ
@@ -190,109 +190,26 @@ struct RPCResult {
 /// - Warning: このクラスの中以外のメソッドを呼び出すためにRPCを利用してはいけません
 @MainActor
 class RPCModel: ObservableObject {
-    /// 送信するデータ
-    private var sendExchangeDataWrapper = ExchangeDataWrapper()
-    /// 受信したデータ
-    private var receiveExchangeDataWrapper = ExchangeDataWrapper()
-
-    /// 変更を検知して発火させる
-    private var cancellable: AnyCancellable?
+    /// RPC リクエストの送受信（エンコード・デコード・再送・ack は MainActor の外で行う）
+    let transport: RPCTransport
 
     /// Peer 情報 — AppModel のものを参照する
-    var mcPeerIDUUIDWrapper: MCPeerIDUUIDWrapper!
-    
-    private let jsonDecoder = JSONDecoder()
-    private let jsonEncoder = JSONEncoder()
-    
-    /// リクエストキュー（再送管理用）
-    private let requestQueue = RequestQueue()
-    
-    /// 送受信した RPC リクエストのロガー
-    private let logger = RPCLogger()
-    
-    init(sendExchangeDataWrapper: ExchangeDataWrapper, receiveExchangeDataWrapper: ExchangeDataWrapper) {
-        self.sendExchangeDataWrapper = sendExchangeDataWrapper
-        self.receiveExchangeDataWrapper = receiveExchangeDataWrapper
-        cancellable = receiveExchangeDataWrapper.$exchangeData.sink { [weak self] exchangeData in
-            self?.receiveExchangeDataDidChange(exchangeData)
-        }
-        
-        // リクエストキューの再送コールバックを設定
-        requestQueue.onRetry = { [weak self] request in
-            self?.resendRequest(request)
-        }
-    }
-    
-    func receiveExchangeDataDidChange(_ exchangeData: ExchangeData) {
-        guard let request = try? jsonDecoder.decode(RequestSchema.self, from: exchangeData.data) else {
-            print("Failed to decode request")
-            return
-        }
-        
-        logger.log(
-            direction: .receive,
-            request: request,
-            from: request.peerId,
-            fromUUID: peerUUID(forHash: request.peerId),
-            to: mcPeerIDUUIDWrapper.mine.hash,
-            toUUID: mcPeerIDUUIDWrapper.myId
-        )
-        
-        _ = receiveRequest(request)
-    }
-    
-    /// Peer の hash から UUID を取得する（自身を含む）
-    private func peerUUID(forHash hash: Int) -> UUID? {
-        if hash == mcPeerIDUUIDWrapper.mine.hash {
-            return mcPeerIDUUIDWrapper.myId
-        }
-        return mcPeerIDUUIDWrapper.peerId(forHash: hash)
-    }
-    
-    /// エンコード済みのリクエストを送信し、ログに記録する
-    /// - Parameters:
-    ///     - request: 送信する `RequestSchema`
-    ///     - data: `request` をエンコードしたデータ
-    ///     - peer: 送信先の Peer の hash（nil の場合は全ピアに送信）
-    ///     - direction: ログに記録する通信方向
-    private func transmit(_ request: RequestSchema, data: Data, to peer: Int?, direction: RPCLogDirection = .send) {
-        logger.log(
-            direction: direction,
-            request: request,
-            from: mcPeerIDUUIDWrapper.mine.hash,
-            fromUUID: mcPeerIDUUIDWrapper.myId,
-            to: peer,
-            toUUID: peer.flatMap { peerUUID(forHash: $0) }
-        )
-        
-        if let peer {
-            sendExchangeDataWrapper.setData(data, to: peer)
-        } else {
-            sendExchangeDataWrapper.setData(data)
-        }
-    }
+    let mcPeerIDUUIDWrapper: MCPeerIDUUIDWrapper
     
     @Published var coordinateTransforms = CoordinateTransforms()
     @Published var painting = Painting()
     
-    /// 再送処理から除外するメソッドかどうかを判定
-    /// 
-    /// 送信順序を必ず維持しなければいけないメソッドでは、再送処理はノイズになるため
-    /// 再送処理の対象から除外されます。これらのメソッドは：
-    /// - キューに追加されません
-    /// - acknowledgment を送信しません
-    /// - タイムアウトによる再送が行われません
-    /// 
-    /// - Parameter method: チェックするメソッド
-    /// - Returns: 除外する場合はtrue
-    private func shouldExcludeFromRetry(_ method: Method) -> Bool {
-        switch method {
-        case .paintingEntity(.addStrokePoint),
-             .paintingEntity(.addBezierStrokePoints),
-             .coordinateTransformEntity(.requestTransform):
-            return true
-        default:
-            return false
+    init(transport: RPCTransport, mcPeerIDUUIDWrapper: MCPeerIDUUIDWrapper) {
+        self.transport = transport
+        self.mcPeerIDUUIDWrapper = mcPeerIDUUIDWrapper
+        
+        // 受信したリクエストを受信した順番に実行する
+        let requests = transport.requests
+        Task { [weak self] in
+            for await request in requests {
+                guard let self else { return }
+                _ = self.receiveRequest(request)
+            }
         }
     }
     
@@ -333,16 +250,7 @@ class RPCModel: ObservableObject {
             return RPCResult("Invalid request")
         }
         // リクエストを送信
-        guard let requestData = try? jsonEncoder.encode(request) else {
-            return RPCResult("Failed to encode request")
-        }
-        
-        // リクエストをキューに追加（除外対象のメソッドは追加しない）
-        if !shouldExcludeFromRetry(request.method) {
-            requestQueue.enqueue(request)
-        }
-        
-        transmit(request, data: requestData, to: nil)
+        transport.send(request)
         return rpcResult
     }
     
@@ -386,16 +294,7 @@ class RPCModel: ObservableObject {
             return RPCResult("Invalid request")
         }
         // リクエストを送信
-        guard let requestData = try? jsonEncoder.encode(request) else {
-            return RPCResult("Failed to encode request")
-        }
-        
-        // リクエストをキューに追加（除外対象のメソッドは追加しない）
-        if !shouldExcludeFromRetry(request.method) {
-            requestQueue.enqueue(request)
-        }
-        
-        transmit(request, data: requestData, to: mcPeerId)
+        transport.send(request, to: .peer(mcPeerId))
         return rpcResult
     }
     
@@ -407,13 +306,7 @@ class RPCModel: ObservableObject {
 //        print("ReceiveMethod: \(request.method)")
 //        print("ReceiveParam \(request.param)")
         
-        // acknowledgment メッセージの処理
-        if case let (.acknowledgment(.ack), .acknowledgment(.ack(param))) = (request.method, request.param) {
-            // 受信したackに対応するリクエストをキューから削除
-            requestQueue.dequeue(param.requestId)
-            return RPCResult()
-        }
-        
+        // acknowledgment は RPCTransport で処理済み
         var rpcResult = RPCResult()
         switch (request.method, request.param) {
         case let (.coordinateTransformEntity(.requestTransform),.coordinateTransformEntity(.requestTransform(p))):
@@ -448,66 +341,15 @@ class RPCModel: ObservableObject {
             return RPCResult("Invalid request")
         }
         if !rpcResult.success {
-            return error(message: rpcResult.errorMessage, to: request.peerId)
+            transport.sendError(message: rpcResult.errorMessage, to: request.peerId)
+            return rpcResult
         }
         
         // リクエストが成功したら acknowledgment を送信（除外対象のメソッドは送信しない）
-        if !shouldExcludeFromRetry(request.method) {
-            sendAcknowledgment(requestId: request.id, to: request.peerId)
+        if RPCTransport.requiresAcknowledgment(request.method) {
+            transport.sendAcknowledgment(requestId: request.id, to: request.peerId)
         }
         
         return rpcResult
-    }
-    
-    /// エラーを送信
-    /// - Parameters:
-    ///     - message: エラーメッセージ
-    ///     - to peerId: 送信先の Peer の UUID
-    /// - Returns: `RPCResult`
-    func error(message: String, to peerId: Int) -> RPCResult {
-        // エラーを送信
-        let request = RequestSchema(peerId: peerId, method: .error, param: .error(ErrorParam(errorMessage: message)))
-        guard let requestData = try? JSONEncoder().encode(request) else {
-            return RPCResult("\"\(message)\" is not send Peer")
-        }
-        transmit(request, data: requestData, to: peerId)
-        return RPCResult(message)
-    }
-    
-    /// Acknowledgment を送信
-    /// - Parameters:
-    ///     - requestId: 確認するリクエストの ID
-    ///     - to peerId: 送信先の Peer の ID
-    private func sendAcknowledgment(requestId: UUID, to peerId: Int) {
-        let ackRequest = RequestSchema(
-            peerId: mcPeerIDUUIDWrapper.mine.hash,
-            method: .ack,
-            param: .ack(AckParam(requestId: requestId))
-        )
-        
-        guard let requestData = try? jsonEncoder.encode(ackRequest) else {
-            print("Failed to encode acknowledgment")
-            return
-        }
-        
-        transmit(ackRequest, data: requestData, to: peerId)
-    }
-    
-    /// リクエストを再送信
-    /// - Parameter request: 再送信するリクエスト
-    private func resendRequest(_ request: RequestSchema) {
-        guard let requestData = try? jsonEncoder.encode(request) else {
-            print("Failed to encode request for resend")
-            return
-        }
-        
-        // リクエストの送信先に応じて送信
-        // mcPeerIdが0でない場合は特定のピアに送信
-        if let peerID = mcPeerIDUUIDWrapper.standby.first(where: { $0.hash == request.peerId }) {
-            transmit(request, data: requestData, to: peerID.hash, direction: .resend)
-        } else {
-            // 該当するピアが見つからない場合は全ピアに送信
-            transmit(request, data: requestData, to: nil, direction: .resend)
-        }
     }
 }

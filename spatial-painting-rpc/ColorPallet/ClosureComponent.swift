@@ -11,10 +11,11 @@ import RealityKit
 /// A component to attach to an entity that updates over time.
 struct ClosureComponent: Component {
     /// The closure that takes the time interval since the last update.
-    let closure: (TimeInterval) -> Void
+    let closure: @MainActor (TimeInterval) -> Void
 
     // Initialize the component by assigning the closure and registering `ClosureSystem`.
-    init(closure: @escaping (TimeInterval) -> Void) {
+    @MainActor
+    init(closure: @escaping @MainActor (TimeInterval) -> Void) {
         self.closure = closure
         ClosureSystem.registerSystem()
     }

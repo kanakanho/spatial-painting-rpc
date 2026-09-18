@@ -24,7 +24,10 @@ struct ImmersiveView: View {
     // added by nagao 2025/12/31
     @State var stylusManager: StylusManager
     @State private var trackingSession = SpatialTrackingSession()
-    let configuration = SpatialTrackingSession.Configuration(tracking: [.world, .accessory])
+    /// SpatialTrackingSession の設定（Sendable ではないため、run のたびに生成する）
+    nonisolated private static func trackingConfiguration() -> SpatialTrackingSession.Configuration {
+        SpatialTrackingSession.Configuration(tracking: [.world, .accessory])
+    }
     
     @State private var latestRightIndexFingerCoordinates: simd_float4x4 = .init()
     @State private var lastIndexPose: SIMD3<Float>? = nil
@@ -87,10 +90,9 @@ struct ImmersiveView: View {
                 // added by nagao 2025/12/31
                 stylusManager.rootEntity = contentEntity
                 stylusManager.appModel = appModel
-                let configuration = SpatialTrackingSession.Configuration(tracking: [.world, .accessory])
                 await stylusManager.handleControllerSetup()
                 Task {
-                    await trackingSession.run(configuration)
+                    await trackingSession.run(Self.trackingConfiguration())
                 }
 
                 /// ColorPalletModel の初期化
@@ -138,8 +140,7 @@ struct ImmersiveView: View {
         }
         .onAppear {
             let manager = PeerManager(
-                sendExchangeDataWrapper: appModel.sendExchangeDataWrapper,
-                receiveExchangeDataWrapper: appModel.receiveExchangeDataWrapper,
+                transport: appModel.rpcModel.transport,
                 mcPeerIDUUIDWrapper: appModel.mcPeerIDUUIDWrapper
             )
             self.peerManager = manager
@@ -167,7 +168,7 @@ struct ImmersiveView: View {
         }
         .task(priority: .high) {
             await stylusManager.handleControllerSetup()
-            await trackingSession.run(configuration)
+            await trackingSession.run(Self.trackingConfiguration())
         }
         /// 空間検出の処理を起動
         .task(priority: .low) {
@@ -434,7 +435,7 @@ struct ImmersiveView: View {
                                     peerId:  appModel.mcPeerIDUUIDWrapper.mine.hash,
                                     method: .addBezierStrokePoints,
                                     param: .addBezierStrokePoints(
-                                        .init(userId: appModel.mcPeerIDUUIDWrapper.myId, bezierPoints: bezierStroke.bezierPoints.getPoints(affine: affineMatrix))
+                                        .init(userId: appModel.mcPeerIDUUIDWrapper.myId, bezierPoints: bezierStroke.bezierPoints.transferData(affine: affineMatrix))
                                     )
                                 ),
                                 mcPeerId: id
@@ -873,18 +874,7 @@ extension ImmersiveView {
 
     private func sendTmpStrokes() {
         for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-            let transformedStrokes: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: BezierStroke) in
-                // points 全てにアフィン変換を適用
-                let tmpRootTransfromPoints: [SIMD4<Float>] = stroke.points.map { (point: SIMD3<Float>) in
-                    return stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
-                }
-                let transformedPoints: [SIMD3<Float>] = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
-                    matmul4x4_4x1(affineMatrix, point)
-                }
-                let transformedStroke: BezierStroke = BezierStroke(uuid: stroke.uuid, points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
-                transformedStroke.bezierPoints = stroke.bezierPoints.getPoints(affine: affineMatrix)
-                return transformedStroke
-            })
+            let transformedStrokes: [BezierStrokeData] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map { $0.transferData(affine: affineMatrix) }
             _ = appModel.rpcModel.sendRequest(
                 .init(
                     peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
@@ -904,18 +894,7 @@ extension ImmersiveView {
             //print("FileManager is already active.")
             appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
             for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                let transformedStrokes: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map({ (stroke: BezierStroke) in
-                    // points 全てにアフィン変換を適用
-                    let tmpRootTransfromPoints: [SIMD4<Float>] = stroke.points.map { (point: SIMD3<Float>) in
-                        return stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(point, 1.0)
-                    }
-                    let transformedPoints: [SIMD3<Float>] = tmpRootTransfromPoints.map { (point: SIMD4<Float>) in
-                        matmul4x4_4x1(affineMatrix, point)
-                    }
-                    let transformedStroke: BezierStroke = BezierStroke(uuid: stroke.uuid, points: transformedPoints, color: stroke.activeColor, maxRadius: stroke.maxRadius)
-                    transformedStroke.bezierPoints = stroke.bezierPoints.getPoints(affine: affineMatrix)
-                    return transformedStroke
-                })
+                let transformedStrokes: [BezierStrokeData] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map { $0.transferData(affine: affineMatrix) }
                 _ = appModel.rpcModel.sendRequest(
                     .init(
                         peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,

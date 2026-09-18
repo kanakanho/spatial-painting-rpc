@@ -8,16 +8,16 @@
 import Foundation
 
 /// RPC で利用する Entity の基底クラス
-protocol RPCEntity: Codable {
+protocol RPCEntity: Codable, Sendable {
     /// RPC で利用するメソッド
     associatedtype Method: RPCEntityMethod
     /// RPC で利用するメソッドの引数
     associatedtype Param: RPCEntityParam
 }
 
-protocol RPCEntityMethod: Codable {}
+protocol RPCEntityMethod: Codable, Sendable {}
 
-protocol RPCEntityParam: Codable {
+protocol RPCEntityParam: Codable, Sendable {
     /// カスタムエンコード
     func encode(to encoder: Encoder) throws
     /// カスタムデコード
