@@ -245,7 +245,8 @@ class RPCModel: ObservableObject {
     private func shouldExcludeFromRetry(_ method: Method) -> Bool {
         switch method {
         case .paintingEntity(.addStrokePoint),
-             .paintingEntity(.addBezierStrokePoints):
+             .paintingEntity(.addBezierStrokePoints),
+             .coordinateTransformEntity(.requestTransform):
             return true
         default:
             return false
