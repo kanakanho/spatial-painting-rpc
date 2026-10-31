@@ -8,12 +8,6 @@
 import SwiftUI
 import RealityKit
 
-struct IndividualStroke {
-    var currentStroke: BezierStroke?
-    var currentPosition: SIMD3<Float> = .zero
-    var isFirstStroke: Bool = true
-}
-
 /// A class that stores each stroke and generates a mesh, in real time, from a person's gesture movement.
 @MainActor
 @Observable
@@ -50,10 +44,6 @@ class PaintingCanvas {
     var boundingBoxEntity: ModelEntity = ModelEntity()
     
     var boundingBoxCenter: SIMD3<Float> = .zero
-    
-    /// The stroke that a person creates.
-    /// UUID : UserId
-    var individualStrokeDic: [UUID: IndividualStroke] = [:]
     
     /// Whether it is in control mode.
     var isControlMode: Bool = false
@@ -130,8 +120,22 @@ class PaintingCanvas {
         let painter = Entity()
         painter.components.set(PainterComponent(userId: userId))
         painter.components.set(BrushComponent())
+        painter.components.set(DraftStrokeComponent())
         paintersRoot.addChild(painter)
         return painter
+    }
+    
+    /// ユーザーが描画中のストローク
+    private func draftStroke(userId: UUID) -> BezierStroke? {
+        guard let entity: Entity = painter(userId: userId)?.components[DraftStrokeComponent.self]?.strokeEntity else {
+            return nil
+        }
+        return BezierStroke(entity: entity)
+    }
+    
+    /// ユーザーがストロークを描画中かどうか
+    func hasDraftStroke(userId: UUID) -> Bool {
+        draftStroke(userId: userId) != nil
     }
     
     /// ユーザーの筆の色
@@ -176,32 +180,20 @@ class PaintingCanvas {
     ///
     /// - Note: true の場合は `addPoint` の前にストロークを確定すること。確定しないと `addPoint` が描画中のストロークを捨ててしまう
     func isStrokeJump(userId: UUID, to position: SIMD3<Float>) -> Bool {
-        guard let individualStroke = individualStrokeDic[userId],
-              individualStroke.currentStroke != nil else {
+        guard let draft: DraftStrokeComponent = painter(userId: userId)?.components[DraftStrokeComponent.self],
+              draft.strokeEntity != nil else {
             return false
         }
-        return length(position - individualStroke.currentPosition) > Self.strokeJumpThreshold
+        return length(position - draft.lastPosition) > Self.strokeJumpThreshold
     }
     
     /// Generate a point when the individual uses the drag gesture.
     func addPoint(_ strokeId: UUID, _ position: SIMD3<Float>, userId: UUID) {
         let painter: Entity = ensurePainter(userId: userId)
-        var individualStroke: IndividualStroke = individualStrokeDic[userId] ?? IndividualStroke()
+        var draft: DraftStrokeComponent = painter.components[DraftStrokeComponent.self] ?? DraftStrokeComponent()
         
-        if individualStroke.isFirstStroke {
-            individualStroke.isFirstStroke = false
-            individualStrokeDic[userId] = individualStroke
-            return
-        }
-        
-        /// currentPosition との距離が一定以上離れている場合は早期リターンする
-        let distance = length(position - individualStroke.currentPosition)
-        individualStroke.currentPosition = position
-        //print("distance: \(distance)")
-        if distance > Self.strokeJumpThreshold {
-            //print("distance is too far, return")
-            individualStroke.currentStroke = nil
-            individualStrokeDic[userId] = individualStroke
+        guard draft.step(to: position, jumpThreshold: Self.strokeJumpThreshold) == .accepted else {
+            painter.components.set(draft)
             return
         }
         
@@ -209,35 +201,37 @@ class PaintingCanvas {
         let threshold: Float = 1E-9
         
         // Start a new stroke if no stroke exists.
-        if individualStroke.currentStroke == nil {
-            individualStroke.currentStroke = BezierStroke(uuid: strokeId)
+        let stroke: BezierStroke
+        if let entity: Entity = draft.strokeEntity, let currentStroke: BezierStroke = BezierStroke(entity: entity) {
+            stroke = currentStroke
+        } else {
+            stroke = BezierStroke(uuid: strokeId)
             if let brush: BrushComponent = painter.components[BrushComponent.self] {
-                individualStroke.currentStroke!.setActiveColor(color: brush.color)
-                individualStroke.currentStroke!.setMaxRadius(radius: brush.maxRadius)
+                stroke.setActiveColor(color: brush.color)
+                stroke.setMaxRadius(radius: brush.maxRadius)
             }
             
             // Add the stroke to the root.
-            root.addChild(individualStroke.currentStroke!.root)
+            root.addChild(stroke.root)
+            draft.strokeEntity = stroke.root
         }
+        painter.components.set(draft)
         
         // Check whether the length between the current hand position and the previous point meets the threshold.
-        if let previousPoint = individualStroke.currentStroke?.points.last, length(position - previousPoint) < threshold {
+        if let previousPoint: SIMD3<Float> = stroke.geometry.points.last, length(position - previousPoint) < threshold {
             return
         }
         
         // Add the current position to the stroke.
         // `points` は computed property で配列全体がコピーされるので、`geometry` に直接追記する
-        individualStroke.currentStroke?.geometry.points.append(position)
+        stroke.geometry.points.append(position)
         
         // Update the current stroke mesh.
-        individualStroke.currentStroke?.updateMesh()
-        
-        individualStrokeDic[userId] = individualStroke
+        stroke.updateMesh()
     }
     
     func addBezierStrokePoints(userId: UUID, bezierPoints: [BezierPointData]) {
-        guard let individualStroke: IndividualStroke = individualStrokeDic[userId],
-              let stroke = individualStroke.currentStroke else {
+        guard let stroke: BezierStroke = draftStroke(userId: userId) else {
             return
         }
         
@@ -246,14 +240,11 @@ class PaintingCanvas {
     }
     
     func individualPoints2Bezier(userId: UUID) -> BezierStroke? {
-        guard var individualStroke: IndividualStroke = individualStrokeDic[userId],
-              let stroke = individualStroke.currentStroke else {
+        guard let stroke: BezierStroke = draftStroke(userId: userId) else {
             return nil
         }
         
         stroke.bezierPoints = points2BezierData(strokeId: stroke.uuid, points: stroke.points)
-        individualStroke.currentStroke = stroke
-        individualStrokeDic[userId] = individualStroke
         
         return stroke
     }
@@ -266,29 +257,23 @@ class PaintingCanvas {
     
     /// Clear the stroke when the drag gesture ends.
     func finishStroke(_ uuid: UUID) {
-        guard var individualStroke: IndividualStroke = individualStrokeDic[uuid] else {
+        guard let stroke: BezierStroke = draftStroke(userId: uuid) else {
             return
         }
         
-        if let stroke = individualStroke.currentStroke {
-            // Trigger the update mesh operation.
-            if stroke.points.count < 8 { // 4->8 by nagao 2025/12/31
-                stroke.root.removeFromParent()
-                individualStroke.currentStroke = nil
-                individualStrokeDic[uuid] = individualStroke
-                return
-            }
+        // Trigger the update mesh operation.
+        if stroke.points.count < 8 { // 4->8 by nagao 2025/12/31
+            stroke.root.removeFromParent()
+        } else {
             stroke.updateMesh()
 //            gridPoints.addPoints(from: stroke.bezierPoints)
             attachControlPoints(to: stroke)
             
             stroke.updateColliders()
-            
-            // Clear the current stroke.
-            individualStroke.currentStroke = nil
-            
-            individualStrokeDic[uuid] = individualStroke
         }
+        
+        // Clear the current stroke.
+        painter(userId: uuid)?.components[DraftStrokeComponent.self]?.strokeEntity = nil
     }
     
     func removeStroke(strokeId: UUID) {

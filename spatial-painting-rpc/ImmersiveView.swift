@@ -801,7 +801,7 @@ extension ImmersiveView {
     /// 自分の端末でベジェ化し、ベジェの情報と finishStroke を共有する
     private func finishOwnStroke() {
         let myId = appModel.mcPeerIDUUIDWrapper.myId
-        guard let stroke = appModel.rpcModel.painting.paintingCanvas.individualStrokeDic[myId], stroke.currentStroke != nil else {
+        guard appModel.rpcModel.painting.paintingCanvas.hasDraftStroke(userId: myId) else {
             return
         }
         print("🫟 send finishStroke")

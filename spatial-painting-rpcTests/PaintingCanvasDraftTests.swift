@@ -170,6 +170,19 @@ struct PaintingCanvasDraftTests {
         #expect(canvas.strokes.isEmpty)
     }
     
+    @Test func testHasDraftStrokeFollowsStrokeLifetime() {
+        let canvas = PaintingCanvas()
+        let strokeId = UUID()
+        #expect(!canvas.hasDraftStroke(userId: userId))
+        
+        startStroke(on: canvas, userId: userId, strokeId: strokeId)
+        #expect(canvas.hasDraftStroke(userId: userId))
+        
+        addPoints(to: canvas, userId: userId, strokeId: strokeId, count: 7)
+        canvas.finishStroke(userId)
+        #expect(!canvas.hasDraftStroke(userId: userId))
+    }
+    
     @Test func testBezierPointsApplyToDraftStroke() {
         let canvas = PaintingCanvas()
         let strokeId = UUID()
