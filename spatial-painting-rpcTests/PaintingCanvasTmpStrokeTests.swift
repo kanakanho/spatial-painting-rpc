@@ -94,9 +94,34 @@ struct PaintingCanvasTmpStrokeTests {
     @Test func testConfirmWithoutTmpStrokesDoesNothing() {
         let canvas = PaintingCanvas()
 
-        canvas.confirmTmpStrokes()
-
+        #expect(canvas.confirmTmpStrokes().isEmpty)
         #expect(canvas.strokes.isEmpty)
+    }
+
+    @Test func testConfirmReturnsStrokesOnCanvas() {
+        let canvas = PaintingCanvas()
+        canvas.addTmpStrokes([makeStroke()])
+
+        let confirmed: [BezierStroke] = canvas.confirmTmpStrokes()
+
+        #expect(confirmed.map(\.uuid) == canvas.strokes.map(\.uuid))
+    }
+
+    @Test func testConfirmMovingStrokesRequiresSelection() {
+        let canvas = PaintingCanvas()
+        canvas.addTmpStrokes([makeStroke()])
+
+        #expect(canvas.confirmMovingStrokes().isEmpty)
+        #expect(canvas.strokes.isEmpty)
+    }
+
+    @Test func testConfirmMovingStrokesClearsSelection() {
+        let canvas = PaintingCanvas()
+        selectForMoving(makeStroke(), on: canvas)
+
+        #expect(canvas.confirmMovingStrokes().count == 1)
+        #expect(canvas.strokes.count == 1)
+        #expect(canvas.confirmMovingStrokes().isEmpty)
     }
 
     @Test func testClearRemovesGroupAndResetsTransform() {

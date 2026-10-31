@@ -28,7 +28,14 @@ class PaintingCanvas {
     let tmpRoot = Entity()
     /// ユーザーごとの Painter の親
     let paintersRoot: Entity = Entity()
-    var tmpStrokes: [BezierStroke] = []
+    /// 位置や大きさをまとめて操作する一時ストローク
+    ///
+    /// - Note: データの実体はグループの子の Entity にある
+    var tmpStrokes: [BezierStroke] {
+        boundingBoxEntity.children.compactMap { (entity: Entity) -> BezierStroke? in
+            return BezierStroke(entity: entity)
+        }
+    }
     
     // added by nagao 2025/11/21
     var movingStrokes: [BezierStroke] = []
@@ -370,19 +377,19 @@ extension PaintingCanvas {
     func addTmpStrokes(_ strokes: [BezierStroke]) {
         if strokes.isEmpty { return }
         //print("load tmp strokes")
-        for stroke in strokes {
-            addTmpStroke(stroke)
+        let newStrokes: [BezierStroke] = tmpStrokes + strokes.map { (stroke: BezierStroke) -> BezierStroke in
+            return makeTmpStroke(from: stroke)
         }
         
         // 頂点同士を繋ぐ線のエンティティを生成
-        let tmpPoints: [SIMD3<Float>] = tmpStrokes.flatMap { (stroke: BezierStroke) -> [SIMD3<Float>] in
+        let tmpPoints: [SIMD3<Float>] = newStrokes.flatMap { (stroke: BezierStroke) -> [SIMD3<Float>] in
             return stroke.points
         }
         guard let boundingBox: BoundingBoxCube = BoundingBoxCube(enclosing: tmpPoints) else { return }
         
         generateInputTargetEntity(boundingBox: boundingBox)
         
-        for stroke in tmpStrokes {
+        for stroke in newStrokes {
             stroke.points = stroke.points.map { (position: SIMD3<Float>) in
                 // entityのローカル座標に変換する
                 return stroke.root.convert(position: position, from: nil)
@@ -407,31 +414,34 @@ extension PaintingCanvas {
         boundingBoxEntity.setPosition(boundingBox.center, relativeTo: nil)
     }
     
-    /// 一時的な Stroke を追加する
-    func addTmpStroke(_ stroke: BezierStroke) {
+    /// 一時的な Stroke を生成する
+    private func makeTmpStroke(from stroke: BezierStroke) -> BezierStroke {
         let newStroke = BezierStroke(uuid: stroke.uuid, originalMaxRadius: stroke.originalMaxRadius)
         newStroke.maxRadius = stroke.maxRadius
         newStroke.setActiveColor(color: stroke.activeColor)
         newStroke.points = stroke.points
         newStroke.bezierPoints = points2BezierData(strokeId: stroke.uuid, points: stroke.points)
         newStroke.updateMesh()
-        self.tmpStrokes.append(newStroke)
+        return newStroke
     }
     
     /// 追加処理の完了 modified by nagao 2015/7/10
-    func confirmTmpStrokes() {
-        if tmpStrokes.isEmpty { return }
+    ///
+    /// - Returns: 確定した新しいストローク
+    @discardableResult
+    func confirmTmpStrokes() -> [BezierStroke] {
         var newStrokes: [BezierStroke] = []
         for stroke in tmpStrokes {
-            stroke.points = stroke.points.map { (position: SIMD3<Float>) in
-                return SIMD3<Float>(stroke.root.transformMatrix(relativeTo: nil) * SIMD4<Float>(position, 1.0))
+            let rootMatrix: simd_float4x4 = stroke.root.transformMatrix(relativeTo: nil)
+            let worldPoints: [SIMD3<Float>] = stroke.points.map { (position: SIMD3<Float>) in
+                return SIMD3<Float>(rootMatrix * SIMD4<Float>(position, 1.0))
             }
             let uuid: UUID = UUID() // added by nagao 2025/11/21
             let newStroke = BezierStroke(uuid: uuid, originalMaxRadius: stroke.originalMaxRadius)
             newStroke.maxRadius = stroke.maxRadius
             newStroke.setActiveColor(color: stroke.activeColor)
-            newStroke.points = stroke.points
-            newStroke.bezierPoints = points2BezierData(strokeId: uuid, points: stroke.points)
+            newStroke.points = worldPoints
+            newStroke.bezierPoints = points2BezierData(strokeId: uuid, points: worldPoints)
             newStroke.updateMesh()
             attachControlPoints(to: newStroke)
             
@@ -440,18 +450,12 @@ extension PaintingCanvas {
             newStroke.updateColliders()
             newStrokes.append(newStroke)
         }
-        
-        // root から tmpStrokes のエンティティを削除
-        //boundingBoxEntity.children.removeAll()
-        tmpStrokes = newStrokes
-        //boundingBoxEntity.removeFromParent()
-        //boundingBoxEntity.transform.matrix = .identity
+        return newStrokes
     }
     
     /// 一時的なストロークをクリアする（追加処理の停止）
     func clearTmpStrokes() {
         boundingBoxEntity.children.removeAll()
-        tmpStrokes.removeAll()
         boundingBoxEntity.removeFromParent()
         boundingBoxEntity.transform.matrix = .identity
     }
@@ -463,11 +467,11 @@ extension PaintingCanvas {
     func clearMovingStrokes() {
         movingStrokes.removeAll()
     }
-    func confirmMovingStrokes() -> Bool {
-        if movingStrokes.isEmpty { return false }
-        confirmTmpStrokes()
+    func confirmMovingStrokes() -> [BezierStroke] {
+        if movingStrokes.isEmpty { return [] }
+        let confirmedStrokes: [BezierStroke] = confirmTmpStrokes()
         movingStrokes.removeAll()
-        return true
+        return confirmedStrokes
     }
     func changeColorOfMovingStrokes(_ color: UIColor ) {
         if movingStrokes.isEmpty { return }

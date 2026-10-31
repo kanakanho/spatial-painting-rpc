@@ -253,10 +253,8 @@ struct ImmersiveView: View {
                                 
                                 value.entity.transform.scale = [sourceTransform!.scale.x * magnification, sourceTransform!.scale.y * magnification, sourceTransform!.scale.z * magnification]
                                 
-                                value.entity.children.forEach { child in
-                                    appModel.rpcModel.painting.paintingCanvas.tmpStrokes.filter({ $0.root.components[StrokeRootComponent.self]?.uuid == child.components[StrokeRootComponent.self]?.uuid }).forEach { stroke in
-                                        stroke.updateMaxRadiusAndRemesh(scaleFactor: value.entity.transform.scale.sum() / 3.0)
-                                    }
+                                for stroke: BezierStroke in appModel.rpcModel.painting.paintingCanvas.tmpStrokes {
+                                    stroke.updateMaxRadiusAndRemesh(scaleFactor: value.entity.transform.scale.sum() / 3.0)
                                 }
                             } else if let translation: Vector3D = value.first?.translation3D {
                                 let convertedTranslation: SIMD3<Float> = value.convert(translation, from: .local, to: value.entity.parent!)
@@ -448,9 +446,7 @@ extension ImmersiveView {
                     materials: [mat]
                 )
             )
-            if appModel.rpcModel.painting.paintingCanvas.confirmMovingStrokes() {
-                sendTmpStrokes()
-            }
+            confirmMovingStrokes()
             appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
             appModel.model.isSelectorMode = false
         }
@@ -468,18 +464,14 @@ extension ImmersiveView {
                     materials: [mat]
                 )
             )
-            if appModel.rpcModel.painting.paintingCanvas.confirmMovingStrokes() {
-                sendTmpStrokes()
-            }
+            confirmMovingStrokes()
             appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
             appModel.model.isEraserMode = false
             appModel.model.isSelectorMode = true
         }
         else if name == "bezier" {
             appModel.model.authoringMode = .bezier
-            if appModel.rpcModel.painting.paintingCanvas.confirmMovingStrokes() {
-                sendTmpStrokes()
-            }
+            confirmMovingStrokes()
             appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
             appModel.model.resetColor()
             let mat = SimpleMaterial(
@@ -835,9 +827,17 @@ extension ImmersiveView {
         )
     }
 
-    private func sendTmpStrokes() {
-        appModel.rpcModel.sendRequestToPeers { affineMatrix in
-            let transformedStrokes: [BezierStrokeData] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map { $0.transferData(affine: affineMatrix) }
+    /// 選択中のストロークを確定して、全ての Peer に共有する
+    private func confirmMovingStrokes() {
+        let confirmedStrokes: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.confirmMovingStrokes()
+        if !confirmedStrokes.isEmpty {
+            sendStrokes(confirmedStrokes)
+        }
+    }
+
+    private func sendStrokes(_ strokes: [BezierStroke]) {
+        appModel.rpcModel.sendRequestToPeers { (affineMatrix: simd_float4x4) -> RequestSchema in
+            let transformedStrokes: [BezierStrokeData] = strokes.map { $0.transferData(affine: affineMatrix) }
             return RequestSchema(
                 peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
                 method: .addBezierStrokes,
@@ -852,8 +852,7 @@ extension ImmersiveView {
             openWindow(id: "ExternalStroke")
         } else {
             //print("FileManager is already active.")
-            appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
-            sendTmpStrokes()
+            sendStrokes(appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes())
             appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
             DispatchQueue.main.async {
                 dismissWindow(id: "ExternalStroke")
