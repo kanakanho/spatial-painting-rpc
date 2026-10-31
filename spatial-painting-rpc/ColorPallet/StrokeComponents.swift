@@ -5,6 +5,7 @@
 
 import Foundation
 import RealityKit
+import simd
 import UIKit
 
 /// ストロークの本体
@@ -66,6 +67,57 @@ struct StrokeAssetsComponent: Component {
     var bezierHandle: Entity
 }
 
+/// 描画するユーザー
+struct PainterComponent: Component {
+    let userId: UUID
+}
+
+/// ユーザーの筆の設定
+struct BrushComponent: Component {
+    var color: UIColor = .white
+    /// The maximum radius of the stroke.
+    var maxRadius: Float = 1E-2
+}
+
+/// ユーザーが描画中のストローク
+struct DraftStrokeComponent: Component {
+    /// 次の点の扱い
+    enum Step {
+        /// 最初の点
+        case ignored
+        /// 手の位置が飛んだ
+        case jumped
+        /// ストロークに追加する
+        case accepted
+    }
+    
+    var strokeEntity: Entity?
+    var lastPosition: SIMD3<Float> = .zero
+    var hasReceivedFirstPoint: Bool = false
+    
+    /// 次の点を受け取り、状態を更新して扱いを返す
+    ///
+    /// - Note: 飛びを検出すると `strokeEntity` を手放す。ストローク自体は削除しない
+    /// - Parameters:
+    ///   - position: 次の点の座標
+    ///   - jumpThreshold: 飛びとみなす距離（m）
+    mutating func step(to position: SIMD3<Float>, jumpThreshold: Float) -> Step {
+        if !hasReceivedFirstPoint {
+            hasReceivedFirstPoint = true
+            return .ignored
+        }
+        
+        /// lastPosition との距離が一定以上離れている場合は飛びとみなす
+        let distance: Float = length(position - lastPosition)
+        lastPosition = position
+        if distance > jumpThreshold {
+            strokeEntity = nil
+            return .jumped
+        }
+        return .accepted
+    }
+}
+
 /// ペイントで使う Component と System の登録
 @MainActor
 enum PaintingECS {
@@ -79,6 +131,9 @@ enum PaintingECS {
         BezierPointComponent.registerComponent()
         BezierControlLineComponent.registerComponent()
         StrokeAssetsComponent.registerComponent()
+        PainterComponent.registerComponent()
+        BrushComponent.registerComponent()
+        DraftStrokeComponent.registerComponent()
         StrokeMeshSystem.registerSystem()
         StrokeColliderSystem.registerSystem()
     }
