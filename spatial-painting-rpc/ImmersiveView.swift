@@ -210,76 +210,10 @@ struct ImmersiveView: View {
                                 return
                             }
                             let initPos: SIMD3<Float> = initIndexPose!
-                            let dist: Float = distance(initPos, pos)
-                            //print("Distance between pos and initPos: \(dist)")
-                            if dist < 0.01 || dist > 0.5 {
-                                return
-                            }
-                            
-                            let entity = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
-                            let comp = entity.components[BezierStrokeControlComponent.self]
-                            let entityPos: SIMD3<Float> = appModel.rpcModel.painting.paintingCanvas.selectedBezierPosition
-
-                            appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
-                                strokeId: comp!.bezierStrokeId,
-                                controlPointId: comp!.bezierPointId,
-                                controlType: comp!.controlType,
-                                newPosition: entityPos + pos - initPos
-                            )
-                            for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                                let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, entityPos + pos - initPos)
-                                _ = appModel.rpcModel.sendRequest(
-                                    RequestSchema(
-                                        peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                                        method: .moveControlPoint,
-                                        param: .moveControlPoint(
-                                            .init(
-                                                strokeId: comp!.bezierStrokeId,
-                                                controlPointId: comp!.bezierPointId,
-                                                controlType: comp!.controlType,
-                                                newPosition: clientPos
-                                            )
-                                        )
-                                    ),
-                                    mcPeerId: id
-                                )
-                            }
+                            moveSelectedControlPoint(from: initPos, to: pos)
                         } else if appModel.rpcModel.painting.paintingCanvas.isBezierSelected, stylusManager.stylusAnchorEntity == nil, let pos: SIMD3<Float> = lastIndexPose, let initPos: SIMD3<Float> = initIndexPose
                         {
-                            let dist: Float = distance(initPos, pos)
-                            //print("Distance between pos and initPos: \(dist)")
-                            if dist < 0.01 || dist > 0.5 {
-                                return
-                            }
-                            
-                            let entity = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
-                            let comp = entity.components[BezierStrokeControlComponent.self]
-                            let entityPos: SIMD3<Float> = appModel.rpcModel.painting.paintingCanvas.selectedBezierPosition
-
-                            appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
-                                strokeId: comp!.bezierStrokeId,
-                                controlPointId: comp!.bezierPointId,
-                                controlType: comp!.controlType,
-                                newPosition: entityPos + pos - initPos
-                            )
-                            for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                                let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, entityPos + pos - initPos)
-                                _ = appModel.rpcModel.sendRequest(
-                                    RequestSchema(
-                                        peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                                        method: .moveControlPoint,
-                                        param: .moveControlPoint(
-                                            .init(
-                                                strokeId: comp!.bezierStrokeId,
-                                                controlPointId: comp!.bezierPointId,
-                                                controlType: comp!.controlType,
-                                                newPosition: clientPos
-                                            )
-                                        )
-                                    ),
-                                    mcPeerId: id
-                                )
-                            }
+                            moveSelectedControlPoint(from: initPos, to: pos)
                         }
                         return
                     }
@@ -335,67 +269,14 @@ struct ImmersiveView: View {
                     else if !appModel.model.isEraserMode, appModel.model.authoringMode == .draw,
                             appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
                             let anchor = stylusManager.stylusAnchorEntity {
-                        isCurrentSendPoint.toggle()
-                        if isCurrentSendPoint {
-                            return
-                        }
-                        let worldTransform = anchor.transformMatrix(relativeTo: nil)
-                        let pos = worldTransform.position
-                        // 手の位置が飛んだら、描画中のストロークを確定してから次のストロークを始める
-                        if appModel.rpcModel.painting.paintingCanvas.isStrokeJump(userId: appModel.mcPeerIDUUIDWrapper.myId, to: pos) {
-                            finishOwnStroke()
-                        }
-                        let uuid: UUID = UUID()
-                        appModel.rpcModel.painting.paintingCanvas.addPoint(uuid, pos, userId: appModel.mcPeerIDUUIDWrapper.myId)
-                        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                            let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, pos)
-                            _ = appModel.rpcModel.sendRequest(
-                                RequestSchema(
-                                    peerId: appModel.rpcModel.mcPeerIDUUIDWrapper.mine.hash,
-                                    method: .addStrokePoint,
-                                    param: .addStrokePoint(
-                                        .init(
-                                            uuid: uuid,
-                                            point: clientPos,
-                                            userId: appModel.mcPeerIDUUIDWrapper.myId
-                                        )
-                                    )
-                                ),
-                                mcPeerId: id
-                            )
-                        }
+                        let pos = anchor.transformMatrix(relativeTo: nil).position
+                        drawPoint(at: pos)
                     }
                     /// ストロークの点の追加 フリーハンド用
                     else if !appModel.model.isEraserMode, appModel.model.authoringMode == .draw,
                             appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
                             stylusManager.stylusAnchorEntity == nil, let pos: SIMD3<Float> = lastIndexPose {
-                        isCurrentSendPoint.toggle()
-                        if isCurrentSendPoint {
-                            return
-                        }
-                        // 手の位置が飛んだら、描画中のストロークを確定してから次のストロークを始める
-                        if appModel.rpcModel.painting.paintingCanvas.isStrokeJump(userId: appModel.mcPeerIDUUIDWrapper.myId, to: pos) {
-                            finishOwnStroke()
-                        }
-                        let uuid: UUID = UUID()
-                        appModel.rpcModel.painting.paintingCanvas.addPoint(uuid, pos, userId: appModel.mcPeerIDUUIDWrapper.myId)
-                        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                            let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, pos)
-                            _ = appModel.rpcModel.sendRequest(
-                                RequestSchema(
-                                    peerId: appModel.rpcModel.mcPeerIDUUIDWrapper.mine.hash,
-                                    method: .addStrokePoint,
-                                    param: .addStrokePoint(
-                                        .init(
-                                            uuid: uuid,
-                                            point: clientPos,
-                                            userId: appModel.mcPeerIDUUIDWrapper.myId
-                                        )
-                                    )
-                                ),
-                                mcPeerId: id
-                            )
-                        }
+                        drawPoint(at: pos)
                     }
                 })
                 .onEnded({ _ in
@@ -848,6 +729,73 @@ extension ImmersiveView {
         appModel.model.colorPalletModel.playBezierHandleSound()
     }
 
+    /// 選択中の制御点を移動し、全ての Peer に共有する
+    ///
+    /// - Parameters:
+    ///   - initPos: 操作を始めた位置
+    ///   - pos: 現在の位置
+    private func moveSelectedControlPoint(from initPos: SIMD3<Float>, to pos: SIMD3<Float>) {
+        let dist: Float = distance(initPos, pos)
+        //print("Distance between pos and initPos: \(dist)")
+        if dist < 0.01 || dist > 0.5 {
+            return
+        }
+        
+        let entity = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
+        let comp = entity.components[BezierStrokeControlComponent.self]
+        let entityPos: SIMD3<Float> = appModel.rpcModel.painting.paintingCanvas.selectedBezierPosition
+        
+        appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
+            strokeId: comp!.bezierStrokeId,
+            controlPointId: comp!.bezierPointId,
+            controlType: comp!.controlType,
+            newPosition: entityPos + pos - initPos
+        )
+        appModel.rpcModel.sendRequestToPeers { affineMatrix in
+            let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, entityPos + pos - initPos)
+            return RequestSchema(
+                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                method: .moveControlPoint,
+                param: .moveControlPoint(
+                    .init(
+                        strokeId: comp!.bezierStrokeId,
+                        controlPointId: comp!.bezierPointId,
+                        controlType: comp!.controlType,
+                        newPosition: clientPos
+                    )
+                )
+            )
+        }
+    }
+    
+    /// ストロークに点を追加し、全ての Peer に共有する
+    private func drawPoint(at pos: SIMD3<Float>) {
+        isCurrentSendPoint.toggle()
+        if isCurrentSendPoint {
+            return
+        }
+        // 手の位置が飛んだら、描画中のストロークを確定してから次のストロークを始める
+        if appModel.rpcModel.painting.paintingCanvas.isStrokeJump(userId: appModel.mcPeerIDUUIDWrapper.myId, to: pos) {
+            finishOwnStroke()
+        }
+        let uuid: UUID = UUID()
+        appModel.rpcModel.painting.paintingCanvas.addPoint(uuid, pos, userId: appModel.mcPeerIDUUIDWrapper.myId)
+        appModel.rpcModel.sendRequestToPeers { affineMatrix in
+            let clientPos: SIMD3<Float> = matmul4x4_3x1(affineMatrix, pos)
+            return RequestSchema(
+                peerId: appModel.rpcModel.mcPeerIDUUIDWrapper.mine.hash,
+                method: .addStrokePoint,
+                param: .addStrokePoint(
+                    .init(
+                        uuid: uuid,
+                        point: clientPos,
+                        userId: appModel.mcPeerIDUUIDWrapper.myId
+                    )
+                )
+            )
+        }
+    }
+
     /// 自分が描画中のストロークを確定する
     ///
     /// 自分の端末でベジェ化し、ベジェの情報と finishStroke を共有する
@@ -864,16 +812,13 @@ extension ImmersiveView {
         }
         
         // ベジェ曲線の情報を共有
-        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-            _ = appModel.rpcModel.sendRequest(
-                RequestSchema(
-                    peerId:  appModel.mcPeerIDUUIDWrapper.mine.hash,
-                    method: .addBezierStrokePoints,
-                    param: .addBezierStrokePoints(
-                        .init(userId: myId, bezierPoints: bezierStroke.bezierPoints.transferData(affine: affineMatrix))
-                    )
-                ),
-                mcPeerId: id
+        appModel.rpcModel.sendRequestToPeers { affineMatrix in
+            RequestSchema(
+                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                method: .addBezierStrokePoints,
+                param: .addBezierStrokePoints(
+                    .init(userId: myId, bezierPoints: bezierStroke.bezierPoints.transferData(affine: affineMatrix))
+                )
             )
         }
         
@@ -891,15 +836,12 @@ extension ImmersiveView {
     }
 
     private func sendTmpStrokes() {
-        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+        appModel.rpcModel.sendRequestToPeers { affineMatrix in
             let transformedStrokes: [BezierStrokeData] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map { $0.transferData(affine: affineMatrix) }
-            _ = appModel.rpcModel.sendRequest(
-                .init(
-                    peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                    method: .addBezierStrokes,
-                    param: .addBezierStrokes(.init(strokes: transformedStrokes))
-                ),
-                mcPeerId: id
+            return RequestSchema(
+                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                method: .addBezierStrokes,
+                param: .addBezierStrokes(.init(strokes: transformedStrokes))
             )
         }
     }
@@ -911,17 +853,7 @@ extension ImmersiveView {
         } else {
             //print("FileManager is already active.")
             appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
-            for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                let transformedStrokes: [BezierStrokeData] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map { $0.transferData(affine: affineMatrix) }
-                _ = appModel.rpcModel.sendRequest(
-                    .init(
-                        peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                        method: .addBezierStrokes,
-                        param: .addBezierStrokes(.init(strokes: transformedStrokes))
-                    ),
-                    mcPeerId: id
-                )
-            }
+            sendTmpStrokes()
             appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
             DispatchQueue.main.async {
                 dismissWindow(id: "ExternalStroke")
