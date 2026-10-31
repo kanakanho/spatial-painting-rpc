@@ -15,6 +15,10 @@ struct StrokeMeshBuilderTests {
         SIMD3<Float>(0.03, 0, 0)
     ]
     private let pointsPerRing = 4
+    
+    private func isFinite(_ vector: SIMD3<Float>) -> Bool {
+        vector.x.isFinite && vector.y.isFinite && vector.z.isFinite
+    }
 
     @Test func testVertexAndIndexCounts() {
         let data = StrokeMeshBuilder.makeMeshData(points: points, maxRadius: 0.01, pointsPerRing: pointsPerRing)
@@ -53,6 +57,34 @@ struct StrokeMeshBuilderTests {
         let data = StrokeMeshBuilder.makeMeshData(points: points, maxRadius: 0.01, pointsPerRing: pointsPerRing)
 
         #expect(data.normals.allSatisfy { abs(length($0) - 1) < 1E-5 })
+    }
+
+    @Test func testVerticalPointsHaveFiniteVertices() {
+        let verticalPoints: [SIMD3<Float>] = [
+            SIMD3<Float>(0, 0, 0),
+            SIMD3<Float>(0, 0.01, 0),
+            SIMD3<Float>(0, 0.02, 0),
+            SIMD3<Float>(0, 0.03, 0)
+        ]
+
+        let data = StrokeMeshBuilder.makeMeshData(points: verticalPoints, maxRadius: 0.01, pointsPerRing: pointsPerRing)
+
+        #expect(data.positions.allSatisfy { isFinite($0) })
+        #expect(data.normals.allSatisfy { isFinite($0) })
+    }
+
+    @Test func testRepeatedPointsHaveFiniteVertices() {
+        let repeatedPoints: [SIMD3<Float>] = [
+            SIMD3<Float>(0, 0, 0),
+            SIMD3<Float>(0.01, 0, 0),
+            SIMD3<Float>(0.01, 0, 0),
+            SIMD3<Float>(0.02, 0, 0)
+        ]
+
+        let data = StrokeMeshBuilder.makeMeshData(points: repeatedPoints, maxRadius: 0.01, pointsPerRing: pointsPerRing)
+
+        #expect(data.positions.allSatisfy { isFinite($0) })
+        #expect(data.normals.allSatisfy { isFinite($0) })
     }
 
     @Test func testEmptyPoints() {

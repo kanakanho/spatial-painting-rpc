@@ -90,6 +90,11 @@ enum StrokeMeshBuilder {
             /// The difference between the current point and the previous point.
             let diff = points[index] - points[index - 1]
 
+            // 同じ座標が連続すると方向を決められないので、既定の方向を使う
+            if length_squared(diff) == 0 {
+                return (maxRadius, SIMD3<Float>(1, 0, 0))
+            }
+
             /// The radius calculated from the difference.
             let radius = maxRadius * powf(clamp(Float(maxRadius / length(diff)), min: Float(0), max: Float(1)), 0.3)
 
@@ -99,8 +104,16 @@ enum StrokeMeshBuilder {
 
     /// Calculate the x and y axes with the given direction.
     private static func calculateAxes(direction: SIMD3<Float>) -> (SIMD3<Float>, SIMD3<Float>) {
-        /// The cross product of the direction and the y-axis that normalizes.
-        let xAxis = normalize(cross(direction, SIMD3<Float>(0, 1, 0)))
+        /// The cross product of the direction and the y-axis.
+        var crossProduct = cross(direction, SIMD3<Float>(0, 1, 0))
+
+        // 進行方向が y 軸と平行だと外積がゼロになるので、x 軸を基準にする
+        if length_squared(crossProduct) < 1E-12 {
+            crossProduct = cross(direction, SIMD3<Float>(1, 0, 0))
+        }
+
+        /// The cross product that normalizes.
+        let xAxis = normalize(crossProduct)
 
         /// The cross product of the direction and `xAxis` value that normalizes.
         let yAxis = normalize(cross(direction, xAxis))
