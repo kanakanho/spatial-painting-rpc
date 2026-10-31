@@ -165,40 +165,12 @@ extension BezierStroke {
         /// 点をシーケンスの次の位置に設定する
         /// - Parameter point: 追加する点の座標
         public func add(point: SIMD3<Float>, pn: PointType) {
-            guard let end = end else {
-                if pn == .end {
-                    self.end = point
-                    updateEndPointMesh()
-                }
-                return
-            }
-            
-            switch pn {
-            case .endControl:
-                endControl = point
-                
-                startControl = end + (end - point)
-                
-                updateDrawingControlPointMesh()
-            case .startControl:
-                startControl = point
-                
-                endControl = end + (end - point)
-                
-                updateDrawingControlPointMesh()
-            case .end:
-                let diff = end - point
-                self.end = point
-                
-                updateEndPointMesh()
-                
-                if let startControl = startControl,
-                   let endControl = endControl {
-                    self.startControl = startControl - diff
-                    self.endControl = endControl - diff
-                    updateDrawingControlPointMesh()
-                }
-            }
+            var data = self.data
+            data.add(point: point, pn: pn)
+            end = data.end
+            startControl = data.startControl
+            endControl = data.endControl
+            remesh()
         }
         
         public func updateEndPointMesh() {
@@ -267,35 +239,7 @@ extension BezierStroke {
 @MainActor
 extension [BezierStroke.BezierPoint] {
     var beziers: [[SIMD3<Float>]] {
-        var beziers: [[SIMD3<Float>]] = []
-        
-        if self.isEmpty { return beziers }
-        if self.count < 2 { return beziers }
-        
-        // 2つの BezierStroke.BezierPoint から それぞれ end,control を取得して、4つのリストにする
-        for i in 0..<(self.count - 1) {
-            let startPoint = self[i]
-            let endPoint = self[i + 1]
-            
-            // 正しい4つの点を取得する
-            // P0: startPoint.end (始点アンカー)
-            // P1: startPoint.endControl (始点から伸びるハンドル)
-            // P2: endPoint.startControl (終点に向かうハンドル)
-            // P3: endPoint.end (終点アンカー)
-            let list: [SIMD3<Float>] = [
-                startPoint.end,
-                startPoint.endControl,
-                endPoint.startControl, // ここを修正
-                endPoint.end
-            ].compactMap { $0 }
-            
-            // 4つの点が揃っている場合のみセグメントとして追加する
-            if list.count == 4 {
-                beziers.append(list)
-            }
-        }
-        
-        return beziers
+        map(\.data).beziers
     }
     
     func add(pointId: UUID, point: SIMD3<Float>, pn: BezierStroke.BezierPoint.PointType) {
