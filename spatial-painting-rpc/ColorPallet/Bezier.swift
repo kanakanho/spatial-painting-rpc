@@ -101,13 +101,6 @@ func beziers2Points(beziers: [[SIMD3<Double>]]) -> [SIMD3<Double>] {
 }
 
 
-@MainActor
-func points2Beziers(strokeId: UUID, points: [SIMD3<Float>], bezierEndPoint: Entity, bezierHandle: Entity, max_error: Float = 0.0001) -> [BezierStroke.BezierPoint] {
-    let fittedBeziers: [[SIMD3<Float>]] = BezierFitter.fitCurve(points: points, maxError: max_error)
-    let bezierPoints: [BezierStroke.BezierPoint] = fittedBeziers.toBezierStrokeBezierPoint(strokeId: strokeId, bezierEndPoint: bezierEndPoint, bezierHandle: bezierHandle)
-    return bezierPoints
-}
-
 /// 点列をベジェ曲線にフィッティングして制御点のデータを生成する
 func points2BezierData(strokeId: UUID, points: [SIMD3<Float>], max_error: Float = 0.0001) -> [BezierPointData] {
     let fittedBeziers: [[SIMD3<Float>]] = BezierFitter.fitCurve(points: points, maxError: max_error)

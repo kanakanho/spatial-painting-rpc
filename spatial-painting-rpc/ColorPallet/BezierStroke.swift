@@ -73,7 +73,10 @@ final class BezierStroke {
         maxRadius = radius
     }
     
-    var bezierPoints: [BezierPoint] = []
+    var bezierPoints: [BezierPointData] {
+        get { geometry.bezierPoints }
+        set { geometry.bezierPoints = newValue }
+    }
     
     /// 元の maxRadius を保持するプロパティを追加（初期値 1E-2）
     var originalMaxRadius: Float {
@@ -116,21 +119,11 @@ final class BezierStroke {
     /// or create a new one with the given mesh data.
     func updateMesh(_ flag: Bool = true) {
         if flag {
-            if !bezierPoints.beziers.isEmpty {
-                points = beziers2Points(beziers: bezierPoints.beziers, resolution: 16)
-            }
+            geometry.resamplePoints()
         }
 
         /// The starting point where the stroke mesh begins.
-        guard let center = points.first,
-              let last = points.last else { return }
-
-        if flag {
-            /// 最後の点を追加
-            if !bezierPoints.beziers.isEmpty {
-                points.append(last)
-            }
-        }
+        guard let center = points.first else { return }
 
         /// The position, normals, and triangle indices that the points generate.
         let meshData = StrokeMeshBuilder.makeMeshData(points: points, maxRadius: maxRadius)
@@ -168,6 +161,48 @@ final class BezierStroke {
         }
     }
     
+    /// 制御点の Entity 群
+    private var controlPointEntities: [Entity] {
+        root.children.filter { (entity: Entity) -> Bool in
+            return entity.components.has(BezierPointComponent.self)
+        }
+    }
+    
+    /// 制御点の Entity 群の表示を切り替える
+    func setControlPointsEnabled(_ isEnabled: Bool) {
+        for entity: Entity in controlPointEntities {
+            entity.isEnabled = isEnabled
+        }
+    }
+    
+    /// `bezierPoints` から制御点の Entity 群を作り直す
+    ///
+    /// - Note: 作り直すと選択中の Entity が失われるので、編集中は `moveControlPoint` を使う
+    func rebuildControlPoints(endPoint: Entity, handle: Entity) {
+        for entity: Entity in controlPointEntities {
+            entity.removeFromParent()
+        }
+        for point: BezierPointData in bezierPoints {
+            let entity: Entity = BezierControlPointFactory.make(data: point, endPoint: endPoint, handle: handle)
+            entity.isEnabled = false
+            root.addChild(entity)
+        }
+    }
+    
+    /// 制御点を移動して Entity の位置を同期する
+    func moveControlPoint(pointId: UUID, to position: SIMD3<Float>, pn: BezierPointType) {
+        guard let index: Int = bezierPoints.firstIndex(where: { $0.uuid == pointId }) else { return }
+        
+        geometry.bezierPoints[index].add(point: position, pn: pn)
+        
+        let entity: Entity? = controlPointEntities.first { (entity: Entity) -> Bool in
+            return entity.components[BezierPointComponent.self]?.pointId == pointId
+        }
+        if let entity: Entity {
+            BezierControlPointFactory.sync(entity, with: geometry.bezierPoints[index])
+        }
+    }
+    
     /// ベジェ編集中など、線の内側を見せるためのカリングを切り替える
     func setFaceCulling(_ isEnabled: Bool) {
         isFaceCullingEnabled = isEnabled
@@ -177,7 +212,7 @@ final class BezierStroke {
     /// 通信・ファイル保存用のデータから生成する
     convenience init(data: BezierStrokeData) {
         self.init(uuid: data.uuid, points: data.points, color: data.color.uiColor, maxRadius: data.maxRadius)
-        self.bezierPoints = data.bezierPoints.map { BezierPoint(data: $0) }
+        self.bezierPoints = data.bezierPoints
     }
     
     /// 通信・ファイル保存用のデータ
@@ -187,7 +222,7 @@ final class BezierStroke {
             points: points,
             color: .init(activeColor),
             maxRadius: maxRadius,
-            bezierPoints: bezierPoints.map(\.data)
+            bezierPoints: bezierPoints
         )
     }
     

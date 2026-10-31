@@ -8,11 +8,16 @@
 import Foundation
 import simd
 
+/// ベジェの制御点の種類
+enum BezierPointType: CaseIterable, Codable, Sendable {
+    case end
+    case startControl
+    case endControl
+}
+
 /// 通信・ファイル保存用のベジェの制御点
 ///
-/// - Note: `BezierStroke.BezierPoint` は RealityKit の Entity を持つため MainActor でしか扱えない。
-///   RPC のエンコード・デコードをメインスレッド外で行えるように、値だけを持つこの型で送受信する。
-///   JSON のキーは `BezierStroke.BezierPoint` の旧 Codable 実装と同じ。
+/// - Note: JSON のキーは `BezierStroke.BezierPoint` の旧 Codable 実装と同じ。
 struct BezierPointData: Codable, Sendable {
     let uuid: UUID
     let strokeId: UUID
@@ -27,7 +32,7 @@ struct BezierPointData: Codable, Sendable {
     /// - Parameters:
     ///   - point: 設定する点の座標
     ///   - pn: 設定する点の種類
-    mutating func add(point: SIMD3<Float>, pn: BezierStroke.BezierPoint.PointType) {
+    mutating func add(point: SIMD3<Float>, pn: BezierPointType) {
         guard let end = end else {
             if pn == .end {
                 self.end = point
@@ -65,6 +70,11 @@ struct BezierPointData: Codable, Sendable {
 }
 
 extension [BezierPointData] {
+    /// アフィン変換を適用した送信用のデータ
+    func transferData(affine: simd_float4x4) -> [BezierPointData] {
+        return self.map { $0.applying(affine) }
+    }
+    
     /// 連続する 2 つの制御点から作る 3 次ベジェのセグメント
     var beziers: [[SIMD3<Float>]] {
         var beziers: [[SIMD3<Float>]] = []
