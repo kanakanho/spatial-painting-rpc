@@ -48,15 +48,6 @@ final class BezierStroke {
         set { style.isFaceCullingEnabled = newValue }
     }
     
-    /// 現在の色とカリング設定を反映したマテリアルを生成する
-    func makeMaterial() -> SimpleMaterial {
-        var material = SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)
-        if isFaceCullingEnabled {
-            material.faceCulling = .front
-        }
-        return material
-    }
-    
     /// The collection of points in 3D space that represent the stroke.
     var points: [SIMD3<Float>] {
         get { geometry.points }
@@ -115,8 +106,10 @@ final class BezierStroke {
         self.updateMesh(false)
     }
     
-    /// Update the mesh with the points of the stroke if it already exists,
-    /// or create a new one with the given mesh data.
+    /// メッシュの再生成を `StrokeMeshSystem` に依頼する
+    ///
+    /// - Note: `flag` が true のときは `points` の再サンプリングとメッシュの Transform の設定まで同期的に行う。
+    ///   呼び出し元が直後に `points` を読んだり、親を付け替えたりするため
     func updateMesh(_ flag: Bool = true) {
         if flag {
             geometry.resamplePoints()
@@ -125,35 +118,8 @@ final class BezierStroke {
         /// The starting point where the stroke mesh begins.
         guard let center = points.first else { return }
 
-        /// The position, normals, and triangle indices that the points generate.
-        let meshData = StrokeMeshBuilder.makeMeshData(points: points, maxRadius: maxRadius)
-        
-        /// The `MeshResource.Contents` instance.
-        let contents = StrokeMeshBuilder.makeContents(meshData)
-        
-        // Replace the mesh with `contents` if there is a mesh component on the stroke.
-        if let mesh = stroke.model?.mesh {
-            do {
-                try mesh.replace(with: contents)
-                // マテリアルを更新 added by nagao 2025/11/21
-                stroke.model?.materials = [makeMaterial()]
-            } catch {
-                print("Error replacing mesh: \(error.localizedDescription)")
-            }
-        } else {
-            /// The new mesh that generates with `content`.
-            guard let mesh = try? MeshResource.generate(from: contents) else {
-                print("Error generating mesh")
-                return
-            }
-            
-            // Set the model component to the new mesh, and assign a simple material.
-            stroke.components.set(ModelComponent(
-                mesh: mesh,
-                materials: [makeMaterial()]
-            ))
-        }
-        
+        root.components.set(StrokeMeshDirty())
+
         if flag {
             // Set the stroke's transform and position.
             stroke.setTransformMatrix(.identity, relativeTo: nil)

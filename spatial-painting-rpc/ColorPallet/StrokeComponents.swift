@@ -24,6 +24,17 @@ struct StrokeStyleComponent: Component {
     var isFaceCullingEnabled: Bool = false
 }
 
+extension StrokeStyleComponent {
+    /// 現在の色とカリング設定を反映したマテリアルを生成する
+    func makeMaterial() -> SimpleMaterial {
+        var material = SimpleMaterial(color: color, roughness: 1.0, isMetallic: false)
+        if isFaceCullingEnabled {
+            material.faceCulling = .front
+        }
+        return material
+    }
+}
+
 /// メッシュを持つ子 Entity の目印
 struct StrokeMeshComponent: Component {}
 
@@ -68,5 +79,6 @@ enum PaintingECS {
         BezierPointComponent.registerComponent()
         BezierControlLineComponent.registerComponent()
         StrokeAssetsComponent.registerComponent()
+        StrokeMeshSystem.registerSystem()
     }
 }
