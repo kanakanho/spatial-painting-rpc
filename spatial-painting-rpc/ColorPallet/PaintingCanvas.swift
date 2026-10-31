@@ -25,7 +25,14 @@ class PaintingCanvas {
     
 //    var gridPoints: GridPoints = GridPoints()
     
-    var strokes: [BezierStroke] = []
+    /// キャンバス上のストローク
+    ///
+    /// - Note: データの実体は Entity ツリーにあり、参照のたびに生成する。同一性は `uuid` で比較すること
+    var strokes: [BezierStroke] {
+        root.children.compactMap { (entity: Entity) -> BezierStroke? in
+            return BezierStroke(entity: entity)
+        }
+    }
     let tmpRoot = Entity()
     var tmpStrokes: [BezierStroke] = []
     var tmpBoundingBoxEntity: Entity = Entity()
@@ -75,7 +82,6 @@ class PaintingCanvas {
     
     func reset() {
         root.children.removeAll()
-        strokes.removeAll()
         addCanvasBoxes()
         root.addChild(tmpRoot)
     }
@@ -190,7 +196,6 @@ class PaintingCanvas {
             individualStroke.currentStroke = BezierStroke(uuid: strokeId)
             individualStroke.currentStroke!.setActiveColor(color: individualStroke.activeColor)
             individualStroke.currentStroke!.setMaxRadius(radius: individualStroke.maxRadius)
-            strokes.append(individualStroke.currentStroke!)
             
             // Add the stroke to the root.
             root.addChild(individualStroke.currentStroke!.root)
@@ -202,7 +207,8 @@ class PaintingCanvas {
         }
         
         // Add the current position to the stroke.
-        individualStroke.currentStroke?.points.append(position)
+        // `points` は computed property で配列全体がコピーされるので、`geometry` に直接追記する
+        individualStroke.currentStroke?.geometry.points.append(position)
         
         // Update the current stroke mesh.
         individualStroke.currentStroke?.updateMesh()
@@ -248,7 +254,6 @@ class PaintingCanvas {
         if let stroke = individualStroke.currentStroke {
             // Trigger the update mesh operation.
             if stroke.points.count < 8 { // 4->8 by nagao 2025/12/31
-                strokes.removeAll { $0.uuid == stroke.uuid }
                 stroke.root.removeFromParent()
                 individualStroke.currentStroke = nil
                 individualStrokeDic[uuid] = individualStroke
@@ -272,7 +277,6 @@ class PaintingCanvas {
 //            gridPoints.removePoints(from: strokes[index].bezierPoints)
 //        }
 //        
-        strokes.removeAll{ $0.root.components[StrokeRootComponent.self]?.uuid == strokeId}
         
         DispatchQueue.main.async {
             let childrenToRemove = self.root.children.filter {
@@ -356,7 +360,6 @@ class PaintingCanvas {
         
         newStroke.updateColliders()
         
-        strokes.append(newStroke)
         root.addChild(newStroke.root)
     }
 }
@@ -438,7 +441,6 @@ extension PaintingCanvas {
             newStroke.updateMesh()
             attachControlPoints(to: newStroke)
             
-            strokes.append(newStroke)
             root.addChild(newStroke.root)
             
             newStroke.updateColliders()

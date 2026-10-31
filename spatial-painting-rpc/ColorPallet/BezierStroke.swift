@@ -91,6 +91,19 @@ final class BezierStroke {
         root.addChild(stroke)
     }
     
+    /// `StrokeComponent` を持つ Entity から生成する
+    init?(entity: Entity) {
+        guard let component: StrokeComponent = entity.components[StrokeComponent.self],
+              entity.components.has(StrokeStyleComponent.self),
+              let stroke: Entity = entity.children.first(where: { $0.components.has(StrokeMeshComponent.self) }) else {
+            return nil
+        }
+        self.uuid = component.id
+        self.root = entity
+        self.stroke = stroke
+        self.geometry = component.geometry
+    }
+    
     convenience init(uuid: UUID, originalMaxRadius: Float = 1E-2) {
         self.init(uuid: uuid, points: [], color: .red, maxRadius: originalMaxRadius)
     }
