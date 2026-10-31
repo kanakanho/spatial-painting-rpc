@@ -610,7 +610,7 @@ extension ImmersiveView {
         )
         
         if let toolBall: ToolBall = appModel.rpcModel.painting.advancedColorPalletModel.toolBalls.get(withID: name),
-           let activeColor: UIColor = appModel.rpcModel.painting.paintingCanvas.individualStrokeDic[appModel.mcPeerIDUUIDWrapper.myId]?.activeColor {
+           let activeColor: UIColor = appModel.rpcModel.painting.paintingCanvas.activeColor(userId: appModel.mcPeerIDUUIDWrapper.myId) {
             let material: SimpleMaterial = SimpleMaterial(color: activeColor, isMetallic: false)
             finger.components.set(ModelComponent(mesh: .generateSphere(radius: Float(toolBall.lineWidth)), materials: [material]))
         }

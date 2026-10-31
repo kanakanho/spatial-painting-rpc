@@ -151,6 +151,25 @@ struct PaintingCanvasDraftTests {
         #expect(canvas.strokes.first?.maxRadius == 0.02)
     }
 
+    @Test func testActiveColorRequiresPainter() {
+        let canvas = PaintingCanvas()
+        #expect(canvas.activeColor(userId: userId) == nil)
+        
+        canvas.setMaxRadius(userId: userId, radius: 0.02)
+        #expect(canvas.activeColor(userId: userId) == .white)
+        
+        canvas.setActiveColor(userId: userId, color: .red)
+        #expect(canvas.activeColor(userId: userId) == .red)
+    }
+    
+    @Test func testPainterIsNotTreatedAsStroke() {
+        let canvas = PaintingCanvas()
+        
+        canvas.setActiveColor(userId: userId, color: .red)
+        
+        #expect(canvas.strokes.isEmpty)
+    }
+    
     @Test func testBezierPointsApplyToDraftStroke() {
         let canvas = PaintingCanvas()
         let strokeId = UUID()

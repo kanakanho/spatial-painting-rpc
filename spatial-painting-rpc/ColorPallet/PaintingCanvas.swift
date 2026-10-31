@@ -12,8 +12,6 @@ struct IndividualStroke {
     var currentStroke: BezierStroke?
     var currentPosition: SIMD3<Float> = .zero
     var isFirstStroke: Bool = true
-    var activeColor: SimpleMaterial.Color = SimpleMaterial.Color.white
-    var maxRadius: Float = 1E-2
 }
 
 /// A class that stores each stroke and generates a mesh, in real time, from a person's gesture movement.
@@ -34,6 +32,8 @@ class PaintingCanvas {
         }
     }
     let tmpRoot = Entity()
+    /// ユーザーごとの Painter の親
+    let paintersRoot: Entity = Entity()
     var tmpStrokes: [BezierStroke] = []
     var tmpBoundingBoxEntity: Entity = Entity()
     var tmpBoundingBox: BoundingBoxCube = BoundingBoxCube()
@@ -69,6 +69,7 @@ class PaintingCanvas {
         root.components.set(StrokeAssetsComponent(eraser: Entity(), bezierEndPoint: Entity(), bezierHandle: Entity()))
         addCanvasBoxes()
         root.addChild(tmpRoot)
+        root.addChild(paintersRoot)
         
         let color = UIColor(red: 192/255, green: 192/255, blue: 192/255, alpha: 0.5)
         boundingBoxEntity = ModelEntity(
@@ -84,6 +85,7 @@ class PaintingCanvas {
         root.children.removeAll()
         addCanvasBoxes()
         root.addChild(tmpRoot)
+        root.addChild(paintersRoot)
     }
     
     /// Add the six collision boxes that surround the painting canvas.
@@ -113,24 +115,38 @@ class PaintingCanvas {
         return box
     }
     
-    func setActiveColor(userId: UUID ,color: SimpleMaterial.Color) {
-        if let individualStroke: IndividualStroke = individualStrokeDic[userId] {
-            var newIndividualStroke = individualStroke
-            newIndividualStroke.activeColor = color
-            individualStrokeDic[userId] = newIndividualStroke
-        } else {
-            individualStrokeDic[userId] = IndividualStroke(activeColor: color)
+    /// ユーザーの Painter を探す
+    private func painter(userId: UUID) -> Entity? {
+        paintersRoot.children.first { (entity: Entity) -> Bool in
+            return entity.components[PainterComponent.self]?.userId == userId
         }
     }
     
-    func setMaxRadius(userId: UUID,radius: Float) {
-        if let individualStroke: IndividualStroke = individualStrokeDic[userId] {
-            var newIndividualStroke = individualStroke
-            newIndividualStroke.maxRadius = radius
-            individualStrokeDic[userId] = newIndividualStroke
-        } else {
-            individualStrokeDic[userId] = IndividualStroke(maxRadius: radius)
+    /// ユーザーの Painter を探し、なければ作成する
+    private func ensurePainter(userId: UUID) -> Entity {
+        if let painter: Entity = painter(userId: userId) {
+            return painter
         }
+        let painter = Entity()
+        painter.components.set(PainterComponent(userId: userId))
+        painter.components.set(BrushComponent())
+        paintersRoot.addChild(painter)
+        return painter
+    }
+    
+    /// ユーザーの筆の色
+    ///
+    /// - Returns: Painter がなければ nil
+    func activeColor(userId: UUID) -> UIColor? {
+        painter(userId: userId)?.components[BrushComponent.self]?.color
+    }
+    
+    func setActiveColor(userId: UUID ,color: SimpleMaterial.Color) {
+        ensurePainter(userId: userId).components[BrushComponent.self]?.color = color
+    }
+    
+    func setMaxRadius(userId: UUID,radius: Float) {
+        ensurePainter(userId: userId).components[BrushComponent.self]?.maxRadius = radius
     }
     
     func setEntities(eraserEntity: Entity, bezierEndPointEntity: Entity, bezierHandleEntity: Entity) {
@@ -169,6 +185,7 @@ class PaintingCanvas {
     
     /// Generate a point when the individual uses the drag gesture.
     func addPoint(_ strokeId: UUID, _ position: SIMD3<Float>, userId: UUID) {
+        let painter: Entity = ensurePainter(userId: userId)
         var individualStroke: IndividualStroke = individualStrokeDic[userId] ?? IndividualStroke()
         
         if individualStroke.isFirstStroke {
@@ -194,8 +211,10 @@ class PaintingCanvas {
         // Start a new stroke if no stroke exists.
         if individualStroke.currentStroke == nil {
             individualStroke.currentStroke = BezierStroke(uuid: strokeId)
-            individualStroke.currentStroke!.setActiveColor(color: individualStroke.activeColor)
-            individualStroke.currentStroke!.setMaxRadius(radius: individualStroke.maxRadius)
+            if let brush: BrushComponent = painter.components[BrushComponent.self] {
+                individualStroke.currentStroke!.setActiveColor(color: brush.color)
+                individualStroke.currentStroke!.setMaxRadius(radius: brush.maxRadius)
+            }
             
             // Add the stroke to the root.
             root.addChild(individualStroke.currentStroke!.root)
