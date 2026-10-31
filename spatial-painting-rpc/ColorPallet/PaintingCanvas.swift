@@ -152,6 +152,20 @@ class PaintingCanvas {
         selectedBezierPosition = position
     }
 
+    /// 連続する点の間がこの距離（m）より離れたら、手の位置が飛んだとみなして別のストロークにする
+    static let strokeJumpThreshold: Float = 0.1
+    
+    /// 描画中のストロークがあり、次の点が前の点から飛んでいるかどうか
+    ///
+    /// - Note: true の場合は `addPoint` の前にストロークを確定すること。確定しないと `addPoint` が描画中のストロークを捨ててしまう
+    func isStrokeJump(userId: UUID, to position: SIMD3<Float>) -> Bool {
+        guard let individualStroke = individualStrokeDic[userId],
+              individualStroke.currentStroke != nil else {
+            return false
+        }
+        return length(position - individualStroke.currentPosition) > Self.strokeJumpThreshold
+    }
+    
     /// Generate a point when the individual uses the drag gesture.
     func addPoint(_ strokeId: UUID, _ position: SIMD3<Float>, userId: UUID) {
         var individualStroke: IndividualStroke = individualStrokeDic[userId] ?? IndividualStroke()
@@ -166,7 +180,7 @@ class PaintingCanvas {
         let distance = length(position - individualStroke.currentPosition)
         individualStroke.currentPosition = position
         //print("distance: \(distance)")
-        if distance > 0.1 {
+        if distance > Self.strokeJumpThreshold {
             //print("distance is too far, return")
             individualStroke.currentStroke = nil
             individualStrokeDic[userId] = individualStroke

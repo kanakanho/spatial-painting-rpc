@@ -341,6 +341,10 @@ struct ImmersiveView: View {
                         }
                         let worldTransform = anchor.transformMatrix(relativeTo: nil)
                         let pos = worldTransform.position
+                        // 手の位置が飛んだら、描画中のストロークを確定してから次のストロークを始める
+                        if appModel.rpcModel.painting.paintingCanvas.isStrokeJump(userId: appModel.mcPeerIDUUIDWrapper.myId, to: pos) {
+                            finishOwnStroke()
+                        }
                         let uuid: UUID = UUID()
                         appModel.rpcModel.painting.paintingCanvas.addPoint(uuid, pos, userId: appModel.mcPeerIDUUIDWrapper.myId)
                         for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
@@ -368,6 +372,10 @@ struct ImmersiveView: View {
                         isCurrentSendPoint.toggle()
                         if isCurrentSendPoint {
                             return
+                        }
+                        // 手の位置が飛んだら、描画中のストロークを確定してから次のストロークを始める
+                        if appModel.rpcModel.painting.paintingCanvas.isStrokeJump(userId: appModel.mcPeerIDUUIDWrapper.myId, to: pos) {
+                            finishOwnStroke()
                         }
                         let uuid: UUID = UUID()
                         appModel.rpcModel.painting.paintingCanvas.addPoint(uuid, pos, userId: appModel.mcPeerIDUUIDWrapper.myId)
@@ -419,40 +427,8 @@ struct ImmersiveView: View {
                     }
                     
                     if !appModel.model.isEraserMode, appModel.model.authoringMode == .draw,
-                       appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial,
-                       let stroke = appModel.rpcModel.painting.paintingCanvas.individualStrokeDic[self.appModel.mcPeerIDUUIDWrapper.myId], stroke.currentStroke != nil {
-                        print("🫟 send finishStroke")
-                        
-                        // 自分の端末の中でベジェ曲線化
-                        guard let bezierStroke: BezierStroke = appModel.rpcModel.painting.paintingCanvas.individualPoints2Bezier(userId: appModel.mcPeerIDUUIDWrapper.myId) else {
-                            return
-                        }
-                        
-                        // ベジェ曲線の情報を共有
-                        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                            _ = appModel.rpcModel.sendRequest(
-                                RequestSchema(
-                                    peerId:  appModel.mcPeerIDUUIDWrapper.mine.hash,
-                                    method: .addBezierStrokePoints,
-                                    param: .addBezierStrokePoints(
-                                        .init(userId: appModel.mcPeerIDUUIDWrapper.myId, bezierPoints: bezierStroke.bezierPoints.transferData(affine: affineMatrix))
-                                    )
-                                ),
-                                mcPeerId: id
-                            )
-                        }
-                        
-                        _ = appModel.rpcModel.sendRequest(
-                            RequestSchema(
-                                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                                method: .finishStroke,
-                                param: .finishStroke(
-                                    .init(
-                                        userId: appModel.mcPeerIDUUIDWrapper.myId
-                                    )
-                                )
-                            )
-                        )
+                       appModel.rpcModel.coordinateTransforms.coordinateTransformEntity.state == .initial {
+                        finishOwnStroke()
                     }
                 })
         )
@@ -870,6 +846,48 @@ extension ImmersiveView {
         )
         appModel.rpcModel.painting.paintingCanvas.setSelectedBezierEntity(entity)
         appModel.model.colorPalletModel.playBezierHandleSound()
+    }
+
+    /// 自分が描画中のストロークを確定する
+    ///
+    /// 自分の端末でベジェ化し、ベジェの情報と finishStroke を共有する
+    private func finishOwnStroke() {
+        let myId = appModel.mcPeerIDUUIDWrapper.myId
+        guard let stroke = appModel.rpcModel.painting.paintingCanvas.individualStrokeDic[myId], stroke.currentStroke != nil else {
+            return
+        }
+        print("🫟 send finishStroke")
+        
+        // 自分の端末の中でベジェ曲線化
+        guard let bezierStroke: BezierStroke = appModel.rpcModel.painting.paintingCanvas.individualPoints2Bezier(userId: myId) else {
+            return
+        }
+        
+        // ベジェ曲線の情報を共有
+        for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
+            _ = appModel.rpcModel.sendRequest(
+                RequestSchema(
+                    peerId:  appModel.mcPeerIDUUIDWrapper.mine.hash,
+                    method: .addBezierStrokePoints,
+                    param: .addBezierStrokePoints(
+                        .init(userId: myId, bezierPoints: bezierStroke.bezierPoints.transferData(affine: affineMatrix))
+                    )
+                ),
+                mcPeerId: id
+            )
+        }
+        
+        _ = appModel.rpcModel.sendRequest(
+            RequestSchema(
+                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                method: .finishStroke,
+                param: .finishStroke(
+                    .init(
+                        userId: myId
+                    )
+                )
+            )
+        )
     }
 
     private func sendTmpStrokes() {

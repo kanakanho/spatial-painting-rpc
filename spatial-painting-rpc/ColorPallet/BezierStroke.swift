@@ -38,6 +38,18 @@ class BezierStroke {
         activeColor = color
     }
     
+    /// ベジェ編集中など、線の内側を見せるために表面をカリングするかどうか
+    var isFaceCullingEnabled: Bool = false
+    
+    /// 現在の色とカリング設定を反映したマテリアルを生成する
+    func makeMaterial() -> SimpleMaterial {
+        var material = SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)
+        if isFaceCullingEnabled {
+            material.faceCulling = .front
+        }
+        return material
+    }
+    
     /// The stroke that represents the stroke.
     var root = Entity()
     var stroke = Entity()
@@ -127,7 +139,7 @@ class BezierStroke {
             do {
                 try mesh.replace(with: contents)
                 // マテリアルを更新 added by nagao 2025/11/21
-                stroke.model?.materials = [SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)]
+                stroke.model?.materials = [makeMaterial()]
             } catch {
                 print("Error replacing mesh: \(error.localizedDescription)")
             }
@@ -141,7 +153,7 @@ class BezierStroke {
             // Set the model component to the new mesh, and assign a simple material.
             stroke.components.set(ModelComponent(
                 mesh: mesh,
-                materials: [SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)]
+                materials: [makeMaterial()]
             ))
         }
         
@@ -153,6 +165,7 @@ class BezierStroke {
     }
     
     func updateMeshEnableFaceCulling() {
+        isFaceCullingEnabled = true
         if !bezierPoints.beziers.isEmpty {
             points = beziers2Points(beziers: bezierPoints.beziers, resolution: 8)
         }
@@ -191,13 +204,10 @@ class BezierStroke {
             return
         }
         
-        var material: SimpleMaterial = SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)
-        material.faceCulling = .front
-        
         // Set the model component to the new mesh, and assign a simple material.
         stroke.components.set(ModelComponent(
             mesh: mesh,
-            materials: [material]
+            materials: [makeMaterial()]
         ))
         
         // Set the stroke's transform and position.
@@ -206,6 +216,7 @@ class BezierStroke {
     }
     
     func updateMeshDisableFaceCulling() {
+        isFaceCullingEnabled = false
         if !bezierPoints.beziers.isEmpty {
             points = beziers2Points(beziers: bezierPoints.beziers, resolution: 8)
         }
@@ -247,7 +258,7 @@ class BezierStroke {
         // Set the model component to the new mesh, and assign a simple material.
         stroke.components.set(ModelComponent(
             mesh: mesh,
-            materials: [SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)]
+            materials: [makeMaterial()]
         ))
         
         // Set the stroke's transform and position.
