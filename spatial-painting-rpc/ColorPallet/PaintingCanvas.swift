@@ -37,9 +37,6 @@ class PaintingCanvas {
         }
     }
     
-    // added by nagao 2025/11/21
-    var movingStrokes: [BezierStroke] = []
-
     // added by nagao 2025/11/26
     var selectedBezierEntity: Entity = Entity()
     var isBezierSelected: Bool = false
@@ -67,6 +64,7 @@ class PaintingCanvas {
             mass: 0.0)
         boundingBoxEntity.name = "boundingBox"
         boundingBoxEntity.components.set(InputTargetComponent(allowedInputTypes: .indirect))
+        boundingBoxEntity.components.set(StrokeGroupComponent())
         
         root.components.set(StrokeAssetsComponent(eraser: Entity(), bezierEndPoint: Entity(), bezierHandle: Entity()))
         addCanvasBoxes()
@@ -460,17 +458,26 @@ extension PaintingCanvas {
         boundingBoxEntity.transform.matrix = .identity
     }
     
-    // added by nagao 2025/11/21
-    func addMovingStrokes(_ stroke: BezierStroke) {
-        movingStrokes.append(stroke)
+    /// 編集モードで選択した元のストローク
+    private var movingStrokes: [BezierStroke] {
+        let sources: [Entity] = boundingBoxEntity.components[StrokeGroupComponent.self]?.sources ?? []
+        return sources.compactMap { (entity: Entity) -> BezierStroke? in
+            return BezierStroke(entity: entity)
+        }
     }
-    func clearMovingStrokes() {
-        movingStrokes.removeAll()
+    
+    // added by nagao 2025/11/21
+    /// ストロークを選択に加えて、選択中の全てのストロークを一時ストロークにする
+    func addMovingStroke(_ stroke: BezierStroke) {
+        clearTmpStrokes()
+        boundingBoxEntity.components[StrokeGroupComponent.self]?.sources.append(stroke.root)
+        // tmpStrokeに追加
+        addTmpStrokes(movingStrokes)
     }
     func confirmMovingStrokes() -> [BezierStroke] {
         if movingStrokes.isEmpty { return [] }
         let confirmedStrokes: [BezierStroke] = confirmTmpStrokes()
-        movingStrokes.removeAll()
+        boundingBoxEntity.components[StrokeGroupComponent.self]?.sources.removeAll()
         return confirmedStrokes
     }
     func changeColorOfMovingStrokes(_ color: UIColor ) {

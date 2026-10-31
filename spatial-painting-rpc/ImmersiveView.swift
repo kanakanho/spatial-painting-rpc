@@ -649,14 +649,10 @@ extension ImmersiveView {
             $0.uuid == comp.strokeId
         }
         if stroke.count == 0 { return }
-        appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()
-        appModel.rpcModel.painting.paintingCanvas.addMovingStrokes(stroke.first!)
-        // tmpStrokeに追加
-        appModel.rpcModel.painting.paintingCanvas.addTmpStrokes(appModel.rpcModel.painting.paintingCanvas.movingStrokes)
+        appModel.rpcModel.painting.paintingCanvas.addMovingStroke(stroke.first!)
         
-        if !appModel.model.colorPalletModel.colorPalletEntity.isEnabled {
-            deleteStroke(entity)
-        }
+        // 移動中は元のストロークを自分と全ての Peer から見えなくする
+        deleteStroke(entity)
     }
 
     // added by nagao 2025/11/26

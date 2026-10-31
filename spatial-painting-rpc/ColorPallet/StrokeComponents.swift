@@ -118,6 +118,14 @@ struct DraftStrokeComponent: Component {
     }
 }
 
+/// 位置や大きさをまとめて操作する一時ストロークのグループ
+struct StrokeGroupComponent: Component {
+    /// 編集モードで選択した元のストローク。ファイルから読み込んだ場合は空
+    ///
+    /// - Note: 元のストロークが削除されても、データを再利用するために保持する
+    var sources: [Entity] = []
+}
+
 /// ペイントで使う Component と System の登録
 @MainActor
 enum PaintingECS {
@@ -131,6 +139,7 @@ enum PaintingECS {
         BezierPointComponent.registerComponent()
         BezierControlLineComponent.registerComponent()
         StrokeAssetsComponent.registerComponent()
+        StrokeGroupComponent.registerComponent()
         PainterComponent.registerComponent()
         BrushComponent.registerComponent()
         DraftStrokeComponent.registerComponent()

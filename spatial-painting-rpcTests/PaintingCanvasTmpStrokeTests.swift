@@ -21,9 +21,7 @@ struct PaintingCanvasTmpStrokeTests {
 
     /// 編集モードでストロークに触れたときの処理
     private func selectForMoving(_ stroke: BezierStroke, on canvas: PaintingCanvas) {
-        canvas.clearTmpStrokes()
-        canvas.addMovingStrokes(stroke)
-        canvas.addTmpStrokes(canvas.movingStrokes)
+        canvas.addMovingStroke(stroke)
     }
 
     private func isClose(_ lhs: SIMD3<Float>, _ rhs: SIMD3<Float>, tolerance: Float = 1E-3) -> Bool {
