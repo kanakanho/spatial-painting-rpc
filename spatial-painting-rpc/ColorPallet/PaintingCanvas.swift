@@ -342,7 +342,7 @@ class PaintingCanvas {
             for bezierPoint in stroke.bezierPoints {
                 bezierPoint.root.isEnabled = true
             }
-            stroke.updateMeshEnableFaceCulling()
+            stroke.setFaceCulling(true)
         }
     }
     
@@ -351,7 +351,7 @@ class PaintingCanvas {
             for bezierPoint in stroke.bezierPoints {
                 bezierPoint.root.isEnabled = false
             }
-            stroke.updateMeshDisableFaceCulling()
+            stroke.setFaceCulling(false)
         }
     }
     

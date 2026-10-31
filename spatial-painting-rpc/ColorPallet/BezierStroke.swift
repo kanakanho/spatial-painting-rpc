@@ -149,84 +149,12 @@ class BezierStroke {
         }
     }
     
-    func updateMeshEnableFaceCulling() {
-        isFaceCullingEnabled = true
-        if !bezierPoints.beziers.isEmpty {
-            points = beziers2Points(beziers: bezierPoints.beziers, resolution: 8)
-        }
-
-        /// The starting point where the stroke mesh begins.
-        guard let center = points.first,
-              let last = points.last else { return }
-        
-        
-        /// 最後の点を追加
-        if !bezierPoints.beziers.isEmpty {
-            points.append(last)
-        }
-        
-        /// The position, normals, and triangle indices that the points generate.
-        let meshData = StrokeMeshBuilder.makeMeshData(points: points, maxRadius: maxRadius)
-        
-        /// The `MeshResource.Contents` instance.
-        let contents = StrokeMeshBuilder.makeContents(meshData)
-        
-        /// The new mesh that generates with `content`.
-        guard let mesh = try? MeshResource.generate(from: contents) else {
-            print("Error generating mesh")
-            return
-        }
-        
-        // Set the model component to the new mesh, and assign a simple material.
-        stroke.components.set(ModelComponent(
-            mesh: mesh,
-            materials: [makeMaterial()]
-        ))
-        
-        // Set the stroke's transform and position.
-        stroke.setTransformMatrix(.identity, relativeTo: nil)
-        stroke.setPosition(center, relativeTo: nil)
+    /// ベジェ編集中など、線の内側を見せるためのカリングを切り替える
+    func setFaceCulling(_ isEnabled: Bool) {
+        isFaceCullingEnabled = isEnabled
+        updateMesh()
     }
     
-    func updateMeshDisableFaceCulling() {
-        isFaceCullingEnabled = false
-        if !bezierPoints.beziers.isEmpty {
-            points = beziers2Points(beziers: bezierPoints.beziers, resolution: 8)
-        }
-
-        /// The starting point where the stroke mesh begins.
-        guard let center = points.first,
-              let last = points.last else { return }
-        
-        
-        /// 最後の点を追加
-        if !bezierPoints.beziers.isEmpty {
-            points.append(last)
-        }
-        
-        /// The position, normals, and triangle indices that the points generate.
-        let meshData = StrokeMeshBuilder.makeMeshData(points: points, maxRadius: maxRadius)
-        
-        /// The `MeshResource.Contents` instance.
-        let contents = StrokeMeshBuilder.makeContents(meshData)
-        
-        /// The new mesh that generates with `content`.
-        guard let mesh = try? MeshResource.generate(from: contents) else {
-            print("Error generating mesh")
-            return
-        }
-        
-        // Set the model component to the new mesh, and assign a simple material.
-        stroke.components.set(ModelComponent(
-            mesh: mesh,
-            materials: [makeMaterial()]
-        ))
-        
-        // Set the stroke's transform and position.
-        stroke.setTransformMatrix(.identity, relativeTo: nil)
-        stroke.setPosition(center, relativeTo: nil)
-    }
-            
     // pointを変更しない
     public init(uuid: UUID, points: [SIMD3<Float>] = [], color: SimpleMaterial.Color = .white, maxRadius: Float = 1E-2) {
         self.uuid = uuid
