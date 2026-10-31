@@ -7,6 +7,14 @@ import Foundation
 import RealityKit
 import UIKit
 
+/// ストロークの本体
+///
+/// - Note: データの実体は `StrokeGeometry` にあり、この Component は参照のみを持つ
+struct StrokeComponent: Component {
+    let id: UUID
+    let geometry: StrokeGeometry
+}
+
 /// ストロークの見た目
 struct StrokeStyleComponent: Component {
     var color: UIColor
@@ -51,6 +59,7 @@ struct StrokeAssetsComponent: Component {
 @MainActor
 enum PaintingECS {
     static func register() {
+        StrokeComponent.registerComponent()
         StrokeStyleComponent.registerComponent()
         StrokeMeshComponent.registerComponent()
         StrokeMeshDirty.registerComponent()

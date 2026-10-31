@@ -10,14 +10,6 @@ import SwiftUI
 import RealityKit
 import simd
 
-struct StrokeComponent: Component {
-    var uuid: UUID
-    
-    init(_ uuid: UUID) {
-        self.uuid = uuid
-    }
-}
-
 struct StrokeRootComponent: Component {
     var uuid: UUID
     
@@ -27,19 +19,34 @@ struct StrokeRootComponent: Component {
 }
 
 
+/// ストロークの Entity の操作をまとめたラッパー
+///
+/// - Note: データの実体は `StrokeGeometry` と Component にある。
+///   Phase 3 までの移行措置で、呼び出し元が Component を直接扱うようになったら削除する
 @MainActor
-@Observable
-class BezierStroke {
-    var uuid: UUID
+final class BezierStroke {
+    let uuid: UUID
     
-    var activeColor: SimpleMaterial.Color = SimpleMaterial.Color.red
+    /// The stroke that represents the stroke.
+    let root: Entity
+    let stroke: Entity
+    
+    let geometry: StrokeGeometry
+    
+    var activeColor: SimpleMaterial.Color {
+        get { style.color }
+        set { style.color = newValue }
+    }
     
     func setActiveColor(color: SimpleMaterial.Color) {
         activeColor = color
     }
     
     /// ベジェ編集中など、線の内側を見せるために表面をカリングするかどうか
-    var isFaceCullingEnabled: Bool = false
+    var isFaceCullingEnabled: Bool {
+        get { style.isFaceCullingEnabled }
+        set { style.isFaceCullingEnabled = newValue }
+    }
     
     /// 現在の色とカリング設定を反映したマテリアルを生成する
     func makeMaterial() -> SimpleMaterial {
@@ -50,21 +57,21 @@ class BezierStroke {
         return material
     }
     
-    /// The stroke that represents the stroke.
-    var root = Entity()
-    var stroke = Entity()
-    
     /// The collection of points in 3D space that represent the stroke.
-    var points: [SIMD3<Float>] = []
+    var points: [SIMD3<Float>] {
+        get { geometry.points }
+        set { geometry.points = newValue }
+    }
     
     /// The maximum radius of the stroke.
-    var maxRadius: Float = 1E-2
+    var maxRadius: Float {
+        get { style.maxRadius }
+        set { style.maxRadius = newValue }
+    }
     
     func setMaxRadius(radius: Float) {
         maxRadius = radius
     }
-    
-    var tmpBezier: BezierPoint
     
     var bezierPoints: [BezierPoint] = []
     
@@ -73,13 +80,25 @@ class BezierStroke {
         return 1E-2
     }
     
-    init(uuid: UUID, originalMaxRadius: Float = 1E-2) {
+    private var style: StrokeStyleComponent {
+        get { root.components[StrokeStyleComponent.self]! }
+        set { root.components.set(newValue) }
+    }
+    
+    init(uuid: UUID, points: [SIMD3<Float>], color: SimpleMaterial.Color, maxRadius: Float) {
         self.uuid = uuid
-        self.maxRadius = originalMaxRadius
-        self.tmpBezier = BezierPoint(strokeId: uuid)
-        stroke.components.set(StrokeComponent(uuid))
+        self.root = Entity()
+        self.stroke = Entity()
+        self.geometry = StrokeGeometry(points: points)
+        stroke.components.set(StrokeMeshComponent())
+        root.components.set(StrokeComponent(id: uuid, geometry: geometry))
+        root.components.set(StrokeStyleComponent(color: color, maxRadius: maxRadius))
         root.components.set(StrokeRootComponent(uuid))
         root.addChild(stroke)
+    }
+    
+    convenience init(uuid: UUID, originalMaxRadius: Float = 1E-2) {
+        self.init(uuid: uuid, points: [], color: .red, maxRadius: originalMaxRadius)
     }
     
     //修正 by nagao 2025/7/15
@@ -153,29 +172,6 @@ class BezierStroke {
     func setFaceCulling(_ isEnabled: Bool) {
         isFaceCullingEnabled = isEnabled
         updateMesh()
-    }
-    
-    // pointを変更しない
-    public init(uuid: UUID, points: [SIMD3<Float>] = [], color: SimpleMaterial.Color = .white, maxRadius: Float = 1E-2) {
-        self.uuid = uuid
-        self.tmpBezier = BezierPoint(strokeId: uuid)
-        self.points = points
-        self.activeColor = color
-        self.maxRadius = maxRadius
-        stroke.components.set(StrokeComponent(uuid))
-        root.components.set(StrokeRootComponent(uuid))
-        root.addChild(stroke)
-    }
-    
-    public init(uuid: UUID, points: [SIMD3<Float>] = [], color: CGColor = .init(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), maxRadius: Float = 1E-2) {
-        self.uuid = uuid
-        self.tmpBezier = BezierPoint(strokeId: uuid)
-        self.points = points
-        self.activeColor = .init(cgColor: color)
-        self.maxRadius = maxRadius
-        stroke.components.set(StrokeComponent(uuid))
-        root.components.set(StrokeRootComponent(uuid))
-        root.addChild(stroke)
     }
     
     /// 通信・ファイル保存用のデータから生成する
