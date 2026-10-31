@@ -16,9 +16,9 @@ import simd
 struct BezierPointData: Codable, Sendable {
     let uuid: UUID
     let strokeId: UUID
-    var end: SIMD3<Float>?
-    var startControl: SIMD3<Float>?
-    var endControl: SIMD3<Float>?
+    var end: SIMD3<Float>? = nil
+    var startControl: SIMD3<Float>? = nil
+    var endControl: SIMD3<Float>? = nil
 
     /// 点を指定した種類の位置に設定する
     ///
@@ -94,6 +94,34 @@ extension [BezierPointData] {
         }
         
         return beziers
+    }
+}
+
+extension [[SIMD3<Float>]] {
+    /// ベジェのセグメント [firstPoint, ctrl1, ctrl2, lastPoint] を制御点のデータに変換する
+    func toBezierPointData(strokeId: UUID) -> [BezierPointData] {
+        // 4点ない場合は消す
+        if self.count < 3 {
+            return []
+        }
+        
+        guard let end = self.first?[0],
+              let endControl = self.first?[1] else { return [] }
+        
+        var startPoint = BezierPointData(uuid: UUID(), strokeId: strokeId)
+        startPoint.add(point: end, pn: .end)
+        startPoint.add(point: endControl, pn: .endControl)
+        
+        var bezierPoints: [BezierPointData] = [startPoint]
+        
+        for points in self {
+            var bezierPoint = BezierPointData(uuid: UUID(), strokeId: strokeId)
+            bezierPoint.add(point: points[3], pn: .end)
+            bezierPoint.add(point: points[2], pn: .startControl)
+            
+            bezierPoints.append(bezierPoint)
+        }
+        return bezierPoints
     }
 }
 

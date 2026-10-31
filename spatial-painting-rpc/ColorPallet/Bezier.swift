@@ -108,6 +108,12 @@ func points2Beziers(strokeId: UUID, points: [SIMD3<Float>], bezierEndPoint: Enti
     return bezierPoints
 }
 
+/// 点列をベジェ曲線にフィッティングして制御点のデータを生成する
+func points2BezierData(strokeId: UUID, points: [SIMD3<Float>], max_error: Float = 0.0001) -> [BezierPointData] {
+    let fittedBeziers: [[SIMD3<Float>]] = BezierFitter.fitCurve(points: points, maxError: max_error)
+    return fittedBeziers.toBezierPointData(strokeId: strokeId)
+}
+
 // MARK: - ベジェ点評価
 
 func cubicBezierPoint3D(p0: SIMD3<Double>, p1: SIMD3<Double>, p2: SIMD3<Double>, p3: SIMD3<Double>, t: Double) -> SIMD3<Double> {
