@@ -411,10 +411,10 @@ extension ImmersiveView {
                 selectBezierHandle(event.entityB)
             }
         }
-        else if event.entityB.hasStrokeRootComponent, appModel.model.isEraserMode, appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty, !appModel.rpcModel.painting.paintingCanvas.isControlMode {
+        else if event.entityB.hasStrokeColliderComponent, appModel.model.isEraserMode, appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty, !appModel.rpcModel.painting.paintingCanvas.isControlMode {
             deleteStroke(event.entityB)
         }
-        else if event.entityB.hasStrokeRootComponent, appModel.model.isSelectorMode {
+        else if event.entityB.hasStrokeColliderComponent, appModel.model.isSelectorMode {
             selectStroke(event.entityB)
         }
         else if name == "button" {
@@ -640,21 +640,21 @@ extension ImmersiveView {
     }
     
     private func deleteStroke(_ entity: Entity) {
-        guard let comp: StrokeRootComponent = entity.components[StrokeRootComponent.self] else { return }
+        guard let comp: StrokeColliderComponent = entity.components[StrokeColliderComponent.self] else { return }
         _ = appModel.rpcModel.sendRequest(
             RequestSchema(
                 peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
                 method: .removeStroke,
-                param: .removeStroke(.init(uuid: comp.uuid))
+                param: .removeStroke(.init(uuid: comp.strokeId))
             )
         )
     }
     
     // added by nagao 2025/11/21
     private func selectStroke(_ entity: Entity) {
-        guard let comp: StrokeRootComponent = entity.components[StrokeRootComponent.self] else { return }
+        guard let comp: StrokeColliderComponent = entity.components[StrokeColliderComponent.self] else { return }
         let stroke: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.strokes.filter {
-            $0.root.components[StrokeRootComponent.self]?.uuid == comp.uuid
+            $0.uuid == comp.strokeId
         }
         if stroke.count == 0 { return }
         appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()

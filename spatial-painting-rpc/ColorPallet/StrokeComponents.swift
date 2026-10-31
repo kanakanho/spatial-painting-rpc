@@ -80,5 +80,6 @@ enum PaintingECS {
         BezierControlLineComponent.registerComponent()
         StrokeAssetsComponent.registerComponent()
         StrokeMeshSystem.registerSystem()
+        StrokeColliderSystem.registerSystem()
     }
 }

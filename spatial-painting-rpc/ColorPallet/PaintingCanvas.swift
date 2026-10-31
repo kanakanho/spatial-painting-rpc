@@ -34,10 +34,6 @@ class PaintingCanvas {
     // added by nagao 2025/11/21
     var movingStrokes: [BezierStroke] = []
 
-    var eraserEntity: Entity = Entity()
-    var bezierEndPointEntity: Entity = Entity()
-    var bezierHandleEntity: Entity = Entity()
-
     // added by nagao 2025/11/26
     var selectedBezierEntity: Entity = Entity()
     var isBezierSelected: Bool = false
@@ -63,6 +59,7 @@ class PaintingCanvas {
     
     // Sets up the painting canvas with six collision boxes that stack on each other.
     init() {
+        root.components.set(StrokeAssetsComponent(eraser: Entity(), bezierEndPoint: Entity(), bezierHandle: Entity()))
         addCanvasBoxes()
         root.addChild(tmpRoot)
         
@@ -131,9 +128,7 @@ class PaintingCanvas {
     }
     
     func setEntities(eraserEntity: Entity, bezierEndPointEntity: Entity, bezierHandleEntity: Entity) {
-        self.eraserEntity = eraserEntity
-        self.bezierEndPointEntity = bezierEndPointEntity
-        self.bezierHandleEntity = bezierHandleEntity
+        root.components.set(StrokeAssetsComponent(eraser: eraserEntity, bezierEndPoint: bezierEndPointEntity, bezierHandle: bezierHandleEntity))
     }
     
     // added by nagao 2025/11/26
@@ -240,7 +235,8 @@ class PaintingCanvas {
     
     /// 制御点の Entity 群を非表示で生成してストロークに付ける
     private func attachControlPoints(to stroke: BezierStroke) {
-        stroke.rebuildControlPoints(endPoint: bezierEndPointEntity, handle: bezierHandleEntity)
+        guard let assets: StrokeAssetsComponent = root.components[StrokeAssetsComponent.self] else { return }
+        stroke.rebuildControlPoints(endPoint: assets.bezierEndPoint, handle: assets.bezierHandle)
     }
     
     /// Clear the stroke when the drag gesture ends.
@@ -262,27 +258,12 @@ class PaintingCanvas {
 //            gridPoints.addPoints(from: stroke.bezierPoints)
             attachControlPoints(to: stroke)
             
-            addEraserColliders(strokeId: stroke.uuid, points: stroke.points)
+            stroke.updateColliders()
             
             // Clear the current stroke.
             individualStroke.currentStroke = nil
             
             individualStrokeDic[uuid] = individualStroke
-        }
-    }
-    
-    /// ストロークを消しゴムで選択するためのコライダーを点列に沿って配置する
-    private func addEraserColliders(strokeId: UUID, points: [SIMD3<Float>]) {
-        for (index, point) in points.enumerated() where index % 5 == 0 {
-            let entity = eraserEntity.clone(recursive: true)
-            entity.name = "clear"
-            var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
-            invisibleMaterial.opacityThreshold = 1.0
-            entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
-            entity.components.set(StrokeRootComponent(strokeId))
-            entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
-            entity.position = point
-            root.addChild(entity)
         }
     }
     
@@ -352,10 +333,7 @@ class PaintingCanvas {
             if stroke.uuid == strokeId {
 //                gridPoints.addPoints(from: stroke.bezierPoints)
                 
-                // 既存のEraserEntityを削除
-                root.children.removeAll(where: { $0.name == "clear" && $0.components[StrokeRootComponent.self]?.uuid == stroke.uuid })
-                
-                addEraserColliders(strokeId: stroke.uuid, points: stroke.points)
+                stroke.updateColliders()
             }
         }
     }
@@ -376,7 +354,7 @@ class PaintingCanvas {
         attachControlPoints(to: newStroke)
 //        gridPoints.addPoints(from: newStroke.bezierPoints)
         
-        addEraserColliders(strokeId: stroke.uuid, points: stroke.points)
+        newStroke.updateColliders()
         
         strokes.append(newStroke)
         root.addChild(newStroke.root)
@@ -463,7 +441,7 @@ extension PaintingCanvas {
             strokes.append(newStroke)
             root.addChild(newStroke.root)
             
-            addEraserColliders(strokeId: uuid, points: stroke.points)
+            newStroke.updateColliders()
             newStrokes.append(newStroke)
         }
         

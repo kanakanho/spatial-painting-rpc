@@ -127,6 +127,11 @@ final class BezierStroke {
         }
     }
     
+    /// 消しゴム用コライダーの再生成を `StrokeColliderSystem` に依頼する
+    func updateColliders() {
+        root.components.set(StrokeColliderDirty())
+    }
+    
     /// 制御点の Entity 群
     private var controlPointEntities: [Entity] {
         root.children.filter { (entity: Entity) -> Bool in
