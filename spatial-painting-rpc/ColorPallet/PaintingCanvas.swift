@@ -29,8 +29,6 @@ class PaintingCanvas {
     /// ユーザーごとの Painter の親
     let paintersRoot: Entity = Entity()
     var tmpStrokes: [BezierStroke] = []
-    var tmpBoundingBoxEntity: Entity = Entity()
-    var tmpBoundingBox: BoundingBoxCube = BoundingBoxCube()
     
     // added by nagao 2025/11/21
     var movingStrokes: [BezierStroke] = []
@@ -41,9 +39,7 @@ class PaintingCanvas {
     var selectedBezierPosition: SIMD3<Float> = .zero
 
     // added by nagao 2025/7/10
-    var boundingBoxEntity: ModelEntity = ModelEntity()
-    
-    var boundingBoxCenter: SIMD3<Float> = .zero
+    let boundingBoxEntity: ModelEntity
     
     /// Whether it is in control mode.
     var isControlMode: Bool = false
@@ -56,11 +52,6 @@ class PaintingCanvas {
     
     // Sets up the painting canvas with six collision boxes that stack on each other.
     init() {
-        root.components.set(StrokeAssetsComponent(eraser: Entity(), bezierEndPoint: Entity(), bezierHandle: Entity()))
-        addCanvasBoxes()
-        root.addChild(tmpRoot)
-        root.addChild(paintersRoot)
-        
         let color = UIColor(red: 192/255, green: 192/255, blue: 192/255, alpha: 0.5)
         boundingBoxEntity = ModelEntity(
             mesh: .generateBox(size: 0.1, cornerRadius: 0.0),
@@ -69,6 +60,11 @@ class PaintingCanvas {
             mass: 0.0)
         boundingBoxEntity.name = "boundingBox"
         boundingBoxEntity.components.set(InputTargetComponent(allowedInputTypes: .indirect))
+        
+        root.components.set(StrokeAssetsComponent(eraser: Entity(), bezierEndPoint: Entity(), bezierHandle: Entity()))
+        addCanvasBoxes()
+        root.addChild(tmpRoot)
+        root.addChild(paintersRoot)
     }
     
     func reset() {
@@ -379,9 +375,12 @@ extension PaintingCanvas {
         }
         
         // 頂点同士を繋ぐ線のエンティティを生成
-        generateBoundingBox()
+        let tmpPoints: [SIMD3<Float>] = tmpStrokes.flatMap { (stroke: BezierStroke) -> [SIMD3<Float>] in
+            return stroke.points
+        }
+        guard let boundingBox: BoundingBoxCube = BoundingBoxCube(enclosing: tmpPoints) else { return }
         
-        generateInputTargetEntity()
+        generateInputTargetEntity(boundingBox: boundingBox)
         
         for stroke in tmpStrokes {
             stroke.points = stroke.points.map { (position: SIMD3<Float>) in
@@ -389,32 +388,23 @@ extension PaintingCanvas {
                 return stroke.root.convert(position: position, from: nil)
             }
             stroke.bezierPoints = points2BezierData(strokeId: stroke.uuid, points: stroke.points)
-            stroke.root.setPosition(stroke.root.position - boundingBoxCenter, relativeTo: nil)
+            stroke.root.setPosition(stroke.root.position - boundingBox.center, relativeTo: nil)
             boundingBoxEntity.addChild(stroke.root)
         }
         tmpRoot.addChild(boundingBoxEntity)
     }
     
     // modified by nagao 2015/7/10
-    func generateInputTargetEntity() {
-        let shapes = ShapeResource.generateBox(
-            width: tmpBoundingBox.corners[.maxXMaxYMaxZ]!.x - tmpBoundingBox.corners[.minXMinYMinZ]!.x,
-            height: tmpBoundingBox.corners[.maxXMaxYMaxZ]!.y - tmpBoundingBox.corners[.minXMinYMinZ]!.y,
-            depth: tmpBoundingBox.corners[.maxXMaxYMaxZ]!.z - tmpBoundingBox.corners[.minXMinYMinZ]!.z
-        )
-        let mesh = MeshResource.generateBox(
-            width: tmpBoundingBox.corners[.maxXMaxYMaxZ]!.x - tmpBoundingBox.corners[.minXMinYMinZ]!.x,
-            height: tmpBoundingBox.corners[.maxXMaxYMaxZ]!.y - tmpBoundingBox.corners[.minXMinYMinZ]!.y,
-            depth: tmpBoundingBox.corners[.maxXMaxYMaxZ]!.z - tmpBoundingBox.corners[.minXMinYMinZ]!.z
-        )
-        let midPoint = tmpBoundingBox.center
-        boundingBoxCenter = midPoint
+    private func generateInputTargetEntity(boundingBox: BoundingBoxCube) {
+        let size: SIMD3<Float> = boundingBox.corners[.maxXMaxYMaxZ]! - boundingBox.corners[.minXMinYMinZ]!
+        let shapes = ShapeResource.generateBox(width: size.x, height: size.y, depth: size.z)
+        let mesh = MeshResource.generateBox(width: size.x, height: size.y, depth: size.z)
         let color = UIColor(red: 192/255, green: 192/255, blue: 192/255, alpha: 0.5)
         let material = SimpleMaterial(color: color, isMetallic: true)
         
         boundingBoxEntity.components.set(ModelComponent(mesh: mesh, materials: [material]))
         boundingBoxEntity.components.set(CollisionComponent(shapes: [shapes], isStatic: true))
-        boundingBoxEntity.setPosition(midPoint, relativeTo: nil)
+        boundingBoxEntity.setPosition(boundingBox.center, relativeTo: nil)
     }
     
     /// 一時的な Stroke を追加する
@@ -537,6 +527,31 @@ extension PaintingCanvas {
             self.corners = corners
         }
         
+        /// 全ての点を囲む直方体を生成する
+        ///
+        /// - Returns: 点がなければ nil
+        init?(enclosing points: [SIMD3<Float>]) {
+            guard let first: SIMD3<Float> = points.first else { return nil }
+            
+            var minimum: SIMD3<Float> = first
+            var maximum: SIMD3<Float> = first
+            for point: SIMD3<Float> in points {
+                minimum = pointwiseMin(minimum, point)
+                maximum = pointwiseMax(maximum, point)
+            }
+            
+            self.corners = [
+                .minXMinYMinZ: SIMD3<Float>(minimum.x, minimum.y, minimum.z),
+                .maxXMinYMinZ: SIMD3<Float>(maximum.x, minimum.y, minimum.z),
+                .minXMaxYMinZ: SIMD3<Float>(minimum.x, maximum.y, minimum.z),
+                .maxXMaxYMinZ: SIMD3<Float>(maximum.x, maximum.y, minimum.z),
+                .minXMinYMaxZ: SIMD3<Float>(minimum.x, minimum.y, maximum.z),
+                .maxXMinYMaxZ: SIMD3<Float>(maximum.x, minimum.y, maximum.z),
+                .minXMaxYMaxZ: SIMD3<Float>(minimum.x, maximum.y, maximum.z),
+                .maxXMaxYMaxZ: SIMD3<Float>(maximum.x, maximum.y, maximum.z)
+            ]
+        }
+        
         var center: SIMD3<Float> {
             let sum = corners.values.reduce(SIMD3<Float>.zero, +)
             return sum / Float(corners.count)
@@ -554,40 +569,5 @@ extension PaintingCanvas {
             ]
             return surfaceIndices.map { (corners[$0.0]!, corners[$0.1]!, corners[$0.2]!, corners[$0.3]!) }
         }
-    }
-    
-    /// [Stroke] 全体で最も端の位置を取得する
-    ///  - Returns: 最も端の位置（直方体の8頂点）
-    private func generateBoundingBox() {
-        guard !self.tmpStrokes.isEmpty else { return }
-        
-        var minX: Float = .greatestFiniteMagnitude
-        var minY: Float = .greatestFiniteMagnitude
-        var minZ: Float = .greatestFiniteMagnitude
-        var maxX: Float = -.greatestFiniteMagnitude
-        var maxY: Float = -.greatestFiniteMagnitude
-        var maxZ: Float = -.greatestFiniteMagnitude
-        
-        for stroke in self.tmpStrokes {
-            for point in stroke.points {
-                minX = Swift.min(minX, point.x)
-                minY = Swift.min(minY, point.y)
-                minZ = Swift.min(minZ, point.z)
-                maxX = Swift.max(maxX, point.x)
-                maxY = Swift.max(maxY, point.y)
-                maxZ = Swift.max(maxZ, point.z)
-            }
-        }
-        
-        tmpBoundingBox = BoundingBoxCube(corners: [
-            .minXMinYMinZ: SIMD3<Float>(minX, minY, minZ),
-            .maxXMinYMinZ: SIMD3<Float>(maxX, minY, minZ),
-            .minXMaxYMinZ: SIMD3<Float>(minX, maxY, minZ),
-            .maxXMaxYMinZ: SIMD3<Float>(maxX, maxY, minZ),
-            .minXMinYMaxZ: SIMD3<Float>(minX, minY, maxZ),
-            .maxXMinYMaxZ: SIMD3<Float>(maxX, minY, maxZ),
-            .minXMaxYMaxZ: SIMD3<Float>(minX, maxY, maxZ),
-            .maxXMaxYMaxZ: SIMD3<Float>(maxX, maxY, maxZ)
-        ])
     }
 }

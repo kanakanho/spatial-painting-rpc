@@ -30,6 +30,18 @@ struct PaintingCanvasTmpStrokeTests {
         length(lhs - rhs) < tolerance
     }
 
+    @Test func testBoundingBoxEnclosesPoints() throws {
+        let boundingBox = try #require(PaintingCanvas.BoundingBoxCube(enclosing: [[0, 1, 2], [3, -1, 1], [1, 0, 5]]))
+        
+        #expect(boundingBox.corners[.minXMinYMinZ] == [0, -1, 1])
+        #expect(boundingBox.corners[.maxXMaxYMaxZ] == [3, 1, 5])
+        #expect(boundingBox.center == [1.5, 0, 3])
+    }
+    
+    @Test func testBoundingBoxRequiresPoints() {
+        #expect(PaintingCanvas.BoundingBoxCube(enclosing: []) == nil)
+    }
+    
     @Test func testAddTmpStrokesCentersGroupOnBoundingBox() {
         let canvas = PaintingCanvas()
         let stroke: BezierStroke = makeStroke()
