@@ -126,6 +126,16 @@ struct StrokeGroupComponent: Component {
     var sources: [Entity] = []
 }
 
+/// 選択中の制御点（Canvas の root に持たせる）
+struct ControlPointSelectionComponent: Component {
+    var entity: Entity?
+    /// 操作の基準になる位置
+    var basePosition: SIMD3<Float> = .zero
+}
+
+/// 選択中の制御点の目印
+struct SelectedControlPointComponent: Component {}
+
 /// ペイントで使う Component と System の登録
 @MainActor
 enum PaintingECS {
@@ -140,6 +150,8 @@ enum PaintingECS {
         BezierControlLineComponent.registerComponent()
         StrokeAssetsComponent.registerComponent()
         StrokeGroupComponent.registerComponent()
+        ControlPointSelectionComponent.registerComponent()
+        SelectedControlPointComponent.registerComponent()
         PainterComponent.registerComponent()
         BrushComponent.registerComponent()
         DraftStrokeComponent.registerComponent()

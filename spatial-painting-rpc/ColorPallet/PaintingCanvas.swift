@@ -37,11 +37,6 @@ class PaintingCanvas {
         }
     }
     
-    // added by nagao 2025/11/26
-    var selectedBezierEntity: Entity = Entity()
-    var isBezierSelected: Bool = false
-    var selectedBezierPosition: SIMD3<Float> = .zero
-
     // added by nagao 2025/7/10
     let boundingBoxEntity: ModelEntity
     
@@ -66,6 +61,7 @@ class PaintingCanvas {
         boundingBoxEntity.components.set(InputTargetComponent(allowedInputTypes: .indirect))
         boundingBoxEntity.components.set(StrokeGroupComponent())
         
+        root.components.set(ControlPointSelectionComponent())
         root.components.set(StrokeAssetsComponent(eraser: Entity(), bezierEndPoint: Entity(), bezierHandle: Entity()))
         addCanvasBoxes()
         root.addChild(tmpRoot)
@@ -159,19 +155,38 @@ class PaintingCanvas {
     }
     
     // added by nagao 2025/11/26
-    func setSelectedBezierEntity(_ entity: Entity) {
-        selectedBezierEntity = entity
-        isBezierSelected = true
-        selectedBezierPosition = entity.position(relativeTo: nil)
+    /// 選択中の制御点
+    var selectedControlPoint: Entity? {
+        root.components[ControlPointSelectionComponent.self]?.entity
     }
     
-    func setIsBezierSelected(_ isSelected: Bool) {
-        isBezierSelected = isSelected
+    /// 選択中の制御点の操作の基準になる位置
+    var selectedControlPointBasePosition: SIMD3<Float> {
+        root.components[ControlPointSelectionComponent.self]?.basePosition ?? .zero
     }
     
-    func setSelectedBezierPosition(_ position: SIMD3<Float>) {
-        //if isBezierSelected == false { return }
-        selectedBezierPosition = position
+    /// 制御点を選択する
+    ///
+    /// - Returns: 選択済みの Entity なら false
+    func selectControlPoint(_ entity: Entity) -> Bool {
+        if selectedControlPoint === entity {
+            return false
+        }
+        selectedControlPoint?.components.remove(SelectedControlPointComponent.self)
+        entity.components.set(SelectedControlPointComponent())
+        root.components.set(ControlPointSelectionComponent(entity: entity, basePosition: entity.position(relativeTo: nil)))
+        return true
+    }
+    
+    func clearControlPointSelection() {
+        selectedControlPoint?.components.remove(SelectedControlPointComponent.self)
+        root.components.set(ControlPointSelectionComponent())
+    }
+    
+    /// 制御点の現在の位置を操作の基準にする
+    func updateControlPointBasePosition() {
+        guard let entity: Entity = selectedControlPoint else { return }
+        root.components[ControlPointSelectionComponent.self]?.basePosition = entity.position(relativeTo: nil)
     }
 
     /// 連続する点の間がこの距離（m）より離れたら、手の位置が飛んだとみなして別のストロークにする

@@ -201,7 +201,7 @@ struct ImmersiveView: View {
                     }
 
                     if appModel.rpcModel.painting.paintingCanvas.isControlMode {
-                        if appModel.rpcModel.painting.paintingCanvas.isBezierSelected, let anchor = stylusManager.stylusAnchorEntity
+                        if appModel.rpcModel.painting.paintingCanvas.selectedControlPoint != nil, let anchor = stylusManager.stylusAnchorEntity
                         {
                             let worldTransform = anchor.transformMatrix(relativeTo: nil)
                             let pos = worldTransform.position
@@ -211,7 +211,7 @@ struct ImmersiveView: View {
                             }
                             let initPos: SIMD3<Float> = initIndexPose!
                             moveSelectedControlPoint(from: initPos, to: pos)
-                        } else if appModel.rpcModel.painting.paintingCanvas.isBezierSelected, stylusManager.stylusAnchorEntity == nil, let pos: SIMD3<Float> = lastIndexPose, let initPos: SIMD3<Float> = initIndexPose
+                        } else if appModel.rpcModel.painting.paintingCanvas.selectedControlPoint != nil, stylusManager.stylusAnchorEntity == nil, let pos: SIMD3<Float> = lastIndexPose, let initPos: SIMD3<Float> = initIndexPose
                         {
                             moveSelectedControlPoint(from: initPos, to: pos)
                         }
@@ -283,10 +283,9 @@ struct ImmersiveView: View {
                     initIndexPose = nil
 
                     if appModel.rpcModel.painting.paintingCanvas.isControlMode {
-                        if appModel.rpcModel.painting.paintingCanvas.isBezierSelected
+                        if let entity: Entity = appModel.rpcModel.painting.paintingCanvas.selectedControlPoint
                         {
-                            let entity = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
-                            appModel.rpcModel.painting.paintingCanvas.setSelectedBezierPosition(entity.position(relativeTo: nil))
+                            appModel.rpcModel.painting.paintingCanvas.updateControlPointBasePosition()
                             let comp = entity.components[BezierStrokeControlComponent.self]
                             _ = appModel.rpcModel.sendRequest(
                                 RequestSchema(
@@ -487,9 +486,7 @@ extension ImmersiveView {
             appModel.model.isEraserMode = false
             appModel.model.isSelectorMode = false
 
-            let prev = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
-            let flag = appModel.rpcModel.painting.paintingCanvas.isBezierSelected
-            if flag {
+            if let prev: Entity = appModel.rpcModel.painting.paintingCanvas.selectedControlPoint {
                 let mat = SimpleMaterial(
                     color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.1),
                     isMetallic: true
@@ -500,8 +497,7 @@ extension ImmersiveView {
                         materials: [mat]
                     )
                 )
-                appModel.rpcModel.painting.paintingCanvas.setSelectedBezierEntity(Entity())
-                appModel.rpcModel.painting.paintingCanvas.setIsBezierSelected(false)
+                appModel.rpcModel.painting.paintingCanvas.clearControlPointSelection()
             }
             appModel.rpcModel.painting.paintingCanvas.setIsControlMode(true)
         }
@@ -657,9 +653,8 @@ extension ImmersiveView {
 
     // added by nagao 2025/11/26
     private func selectBezierEndPoint(_ entity: Entity) {
-        let prev = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
-        let flag = appModel.rpcModel.painting.paintingCanvas.isBezierSelected
-        if flag, prev != entity {
+        let selected: Entity? = appModel.rpcModel.painting.paintingCanvas.selectedControlPoint
+        if let prev: Entity = selected, prev !== entity {
             let mat = SimpleMaterial(
                 color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.1),
                 isMetallic: true
@@ -670,7 +665,7 @@ extension ImmersiveView {
                     materials: [mat]
                 )
             )
-        } else if prev == entity {
+        } else if selected === entity {
             return
         }
         let mat = SimpleMaterial(
@@ -683,13 +678,12 @@ extension ImmersiveView {
                 materials: [mat]
             )
         )
-        appModel.rpcModel.painting.paintingCanvas.setSelectedBezierEntity(entity)
+        _ = appModel.rpcModel.painting.paintingCanvas.selectControlPoint(entity)
         appModel.model.colorPalletModel.playBezierPointSound()
     }
     private func selectBezierHandle(_ entity: Entity) {
-        let prev = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
-        let flag = appModel.rpcModel.painting.paintingCanvas.isBezierSelected
-        if flag, prev != entity {
+        let selected: Entity? = appModel.rpcModel.painting.paintingCanvas.selectedControlPoint
+        if let prev: Entity = selected, prev !== entity {
             let mat = SimpleMaterial(
                 color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.1),
                 isMetallic: true
@@ -700,7 +694,7 @@ extension ImmersiveView {
                     materials: [mat]
                 )
             )
-        } else if prev == entity {
+        } else if selected === entity {
             return
         }
         let mat = SimpleMaterial(
@@ -713,7 +707,7 @@ extension ImmersiveView {
                 materials: [mat]
             )
         )
-        appModel.rpcModel.painting.paintingCanvas.setSelectedBezierEntity(entity)
+        _ = appModel.rpcModel.painting.paintingCanvas.selectControlPoint(entity)
         appModel.model.colorPalletModel.playBezierHandleSound()
     }
 
@@ -729,9 +723,9 @@ extension ImmersiveView {
             return
         }
         
-        let entity = appModel.rpcModel.painting.paintingCanvas.selectedBezierEntity
+        guard let entity: Entity = appModel.rpcModel.painting.paintingCanvas.selectedControlPoint else { return }
         let comp = entity.components[BezierStrokeControlComponent.self]
-        let entityPos: SIMD3<Float> = appModel.rpcModel.painting.paintingCanvas.selectedBezierPosition
+        let entityPos: SIMD3<Float> = appModel.rpcModel.painting.paintingCanvas.selectedControlPointBasePosition
         
         appModel.rpcModel.painting.paintingCanvas.moveControlPoint(
             strokeId: comp!.bezierStrokeId,
