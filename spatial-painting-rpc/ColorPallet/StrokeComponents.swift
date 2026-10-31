@@ -136,6 +136,9 @@ struct ControlPointSelectionComponent: Component {
 /// 選択中の制御点の目印
 struct SelectedControlPointComponent: Component {}
 
+/// 制御点の見た目の更新待ち
+struct ControlPointAppearanceDirty: Component {}
+
 /// ペイントで使う Component と System の登録
 @MainActor
 enum PaintingECS {
@@ -152,10 +155,12 @@ enum PaintingECS {
         StrokeGroupComponent.registerComponent()
         ControlPointSelectionComponent.registerComponent()
         SelectedControlPointComponent.registerComponent()
+        ControlPointAppearanceDirty.registerComponent()
         PainterComponent.registerComponent()
         BrushComponent.registerComponent()
         DraftStrokeComponent.registerComponent()
         StrokeMeshSystem.registerSystem()
         StrokeColliderSystem.registerSystem()
+        ControlPointHighlightSystem.registerSystem()
     }
 }

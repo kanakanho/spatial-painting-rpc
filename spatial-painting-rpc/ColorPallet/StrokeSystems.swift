@@ -154,3 +154,52 @@ struct StrokeColliderSystem: System {
         return extents.x * prototypeScale
     }
 }
+
+/// `ControlPointAppearanceDirty` が付いた制御点の見た目を、選択状態に合わせて更新する
+struct ControlPointHighlightSystem: System {
+    private static let query: EntityQuery = EntityQuery(
+        where: .has(BezierStrokeControlComponent.self) && .has(ControlPointAppearanceDirty.self)
+    )
+    
+    init(scene: RealityKit.Scene) {}
+    
+    func update(context: SceneUpdateContext) {
+        let entities: [Entity] = Array(context.entities(matching: Self.query, updatingSystemWhen: .rendering))
+        
+        for entity: Entity in entities {
+            entity.components.remove(ControlPointAppearanceDirty.self)
+            
+            guard let control: BezierStrokeControlComponent = entity.components[BezierStrokeControlComponent.self] else {
+                continue
+            }
+            
+            if entity.components.has(SelectedControlPointComponent.self) {
+                entity.components.set(makeSelectedModel(controlType: control.controlType))
+            } else {
+                entity.components.set(makeDeselectedModel())
+            }
+        }
+    }
+    
+    @MainActor
+    private func makeSelectedModel(controlType: BezierPointType) -> ModelComponent {
+        if controlType == .end {
+            let material = SimpleMaterial(
+                color: UIColor(red: 255/255, green: 215/255, blue: 0/255, alpha: 1.0),
+                isMetallic: true
+            )
+            return ModelComponent(mesh: .generateBox(size: 1.1, cornerRadius: 0.0), materials: [material])
+        }
+        let material = SimpleMaterial(color: .red, isMetallic: true)
+        return ModelComponent(mesh: .generateSphere(radius: 5.0), materials: [material])
+    }
+    
+    @MainActor
+    private func makeDeselectedModel() -> ModelComponent {
+        let material = SimpleMaterial(
+            color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.1),
+            isMetallic: true
+        )
+        return ModelComponent(mesh: .generateBox(size: 1.0, cornerRadius: 0.0), materials: [material])
+    }
+}

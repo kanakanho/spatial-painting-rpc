@@ -172,15 +172,23 @@ class PaintingCanvas {
         if selectedControlPoint === entity {
             return false
         }
-        selectedControlPoint?.components.remove(SelectedControlPointComponent.self)
+        deselectControlPoint()
         entity.components.set(SelectedControlPointComponent())
+        entity.components.set(ControlPointAppearanceDirty())
         root.components.set(ControlPointSelectionComponent(entity: entity, basePosition: entity.position(relativeTo: nil)))
         return true
     }
     
     func clearControlPointSelection() {
-        selectedControlPoint?.components.remove(SelectedControlPointComponent.self)
+        deselectControlPoint()
         root.components.set(ControlPointSelectionComponent())
+    }
+    
+    /// 選択中の制御点の目印を外す
+    private func deselectControlPoint() {
+        guard let entity: Entity = selectedControlPoint else { return }
+        entity.components.remove(SelectedControlPointComponent.self)
+        entity.components.set(ControlPointAppearanceDirty())
     }
     
     /// 制御点の現在の位置を操作の基準にする

@@ -83,6 +83,30 @@ struct ControlPointSelectionTests {
         #expect(canvas.selectedControlPointBasePosition == [1, 2, 3])
     }
     
+    @Test func testSwitchingSelectionMarksBothEntitiesForAppearanceUpdate() {
+        let canvas = PaintingCanvas()
+        let first = Entity()
+        let second = Entity()
+        _ = canvas.selectControlPoint(first)
+        first.components.remove(ControlPointAppearanceDirty.self)
+        
+        _ = canvas.selectControlPoint(second)
+        
+        #expect(first.components.has(ControlPointAppearanceDirty.self))
+        #expect(second.components.has(ControlPointAppearanceDirty.self))
+    }
+    
+    @Test func testClearMarksEntityForAppearanceUpdate() {
+        let canvas = PaintingCanvas()
+        let entity = Entity()
+        _ = canvas.selectControlPoint(entity)
+        entity.components.remove(ControlPointAppearanceDirty.self)
+        
+        canvas.clearControlPointSelection()
+        
+        #expect(entity.components.has(ControlPointAppearanceDirty.self))
+    }
+    
     @Test func testSelectionSurvivesReset() {
         let canvas = PaintingCanvas()
         let entity = Entity()

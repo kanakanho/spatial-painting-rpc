@@ -394,18 +394,18 @@ extension ImmersiveView {
         }
         else if name == "bezierEndPoint" {
             if initIndexPose == nil { // added by nagao 2025/12/26
-                selectBezierEndPoint(event.entityB)
+                selectControlPoint(event.entityB)
             } else if stylusManager.stylusAnchorEntity != nil { // added by nagao 2025/12/31
                 initIndexPose = nil
-                selectBezierEndPoint(event.entityB)
+                selectControlPoint(event.entityB)
             }
         }
         else if name == "bezierHandle" {
             if initIndexPose == nil { // added by nagao 2025/12/26
-                selectBezierHandle(event.entityB)
+                selectControlPoint(event.entityB)
             } else if stylusManager.stylusAnchorEntity != nil { // added by nagao 2025/12/31
                 initIndexPose = nil
-                selectBezierHandle(event.entityB)
+                selectControlPoint(event.entityB)
             }
         }
         else if event.entityB.hasStrokeColliderComponent, appModel.model.isEraserMode, appModel.rpcModel.painting.paintingCanvas.tmpStrokes.isEmpty, !appModel.rpcModel.painting.paintingCanvas.isControlMode {
@@ -486,19 +486,7 @@ extension ImmersiveView {
             appModel.model.isEraserMode = false
             appModel.model.isSelectorMode = false
 
-            if let prev: Entity = appModel.rpcModel.painting.paintingCanvas.selectedControlPoint {
-                let mat = SimpleMaterial(
-                    color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.1),
-                    isMetallic: true
-                )
-                prev.components.set(
-                    ModelComponent(
-                        mesh: .generateBox(size: 1.0, cornerRadius: 0.0),
-                        materials: [mat]
-                    )
-                )
-                appModel.rpcModel.painting.paintingCanvas.clearControlPointSelection()
-            }
+            appModel.rpcModel.painting.paintingCanvas.clearControlPointSelection()
             appModel.rpcModel.painting.paintingCanvas.setIsControlMode(true)
         }
     }
@@ -652,63 +640,16 @@ extension ImmersiveView {
     }
 
     // added by nagao 2025/11/26
-    private func selectBezierEndPoint(_ entity: Entity) {
-        let selected: Entity? = appModel.rpcModel.painting.paintingCanvas.selectedControlPoint
-        if let prev: Entity = selected, prev !== entity {
-            let mat = SimpleMaterial(
-                color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.1),
-                isMetallic: true
-            )
-            prev.components.set(
-                ModelComponent(
-                    mesh: .generateBox(size: 1.0, cornerRadius: 0.0),
-                    materials: [mat]
-                )
-            )
-        } else if selected === entity {
+    private func selectControlPoint(_ entity: Entity) {
+        guard appModel.rpcModel.painting.paintingCanvas.selectControlPoint(entity),
+              let control: BezierStrokeControlComponent = entity.components[BezierStrokeControlComponent.self] else {
             return
         }
-        let mat = SimpleMaterial(
-            color: UIColor(red: 255/255, green: 215/255, blue: 0/255, alpha: 1.0),
-            isMetallic: true
-        )
-        entity.components.set(
-            ModelComponent(
-                mesh: .generateBox(size: 1.1, cornerRadius: 0.0),
-                materials: [mat]
-            )
-        )
-        _ = appModel.rpcModel.painting.paintingCanvas.selectControlPoint(entity)
-        appModel.model.colorPalletModel.playBezierPointSound()
-    }
-    private func selectBezierHandle(_ entity: Entity) {
-        let selected: Entity? = appModel.rpcModel.painting.paintingCanvas.selectedControlPoint
-        if let prev: Entity = selected, prev !== entity {
-            let mat = SimpleMaterial(
-                color: UIColor(red: 220/255, green: 220/255, blue: 220/255, alpha: 0.1),
-                isMetallic: true
-            )
-            prev.components.set(
-                ModelComponent(
-                    mesh: .generateBox(size: 1.0, cornerRadius: 0.0),
-                    materials: [mat]
-                )
-            )
-        } else if selected === entity {
-            return
+        if control.controlType == .end {
+            appModel.model.colorPalletModel.playBezierPointSound()
+        } else {
+            appModel.model.colorPalletModel.playBezierHandleSound()
         }
-        let mat = SimpleMaterial(
-            color: .red,
-            isMetallic: true
-        )
-        entity.components.set(
-            ModelComponent(
-                mesh: .generateSphere(radius: 5.0),
-                materials: [mat]
-            )
-        )
-        _ = appModel.rpcModel.painting.paintingCanvas.selectControlPoint(entity)
-        appModel.model.colorPalletModel.playBezierHandleSound()
     }
 
     /// 選択中の制御点を移動し、全ての Peer に共有する
