@@ -63,12 +63,7 @@ class PaintingCanvas {
     
     // Sets up the painting canvas with six collision boxes that stack on each other.
     init() {
-        root.addChild(addBox(size: [big, big, small], position: [0, 0, -0.5 * big]))
-        root.addChild(addBox(size: [big, big, small], position: [0, 0, +0.5 * big]))
-        root.addChild(addBox(size: [big, small, big], position: [0, -0.5 * big, 0]))
-        root.addChild(addBox(size: [big, small, big], position: [0, +0.5 * big, 0]))
-        root.addChild(addBox(size: [small, big, big], position: [-0.5 * big, 0, 0]))
-        root.addChild(addBox(size: [small, big, big], position: [+0.5 * big, 0, 0]))
+        addCanvasBoxes()
         root.addChild(tmpRoot)
         
         let color = UIColor(red: 192/255, green: 192/255, blue: 192/255, alpha: 0.5)
@@ -84,13 +79,18 @@ class PaintingCanvas {
     func reset() {
         root.children.removeAll()
         strokes.removeAll()
+        addCanvasBoxes()
+        root.addChild(tmpRoot)
+    }
+    
+    /// Add the six collision boxes that surround the painting canvas.
+    private func addCanvasBoxes() {
         root.addChild(addBox(size: [big, big, small], position: [0, 0, -0.5 * big]))
         root.addChild(addBox(size: [big, big, small], position: [0, 0, +0.5 * big]))
         root.addChild(addBox(size: [big, small, big], position: [0, -0.5 * big, 0]))
         root.addChild(addBox(size: [big, small, big], position: [0, +0.5 * big, 0]))
         root.addChild(addBox(size: [small, big, big], position: [-0.5 * big, 0, 0]))
         root.addChild(addBox(size: [small, big, big], position: [+0.5 * big, 0, 0]))
-        root.addChild(tmpRoot)
     }
     
     /// Create a collision box that takes in user input with the drag gesture.
@@ -272,21 +272,7 @@ class PaintingCanvas {
                 individualStroke.currentStroke?.root.addChild(stroke.bezierPoints[i].root)
             }
             
-            var count = 0
-            for point in stroke.points {
-                if count % 5 == 0 {
-                    let entity = eraserEntity.clone(recursive: true)
-                    entity.name = "clear"
-                    var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
-                    invisibleMaterial.opacityThreshold = 1.0
-                    entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
-                    entity.components.set(StrokeRootComponent(stroke.uuid))
-                    entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
-                    entity.position = point
-                    root.addChild(entity)
-                }
-                count += 1
-            }
+            addEraserColliders(strokeId: stroke.uuid, points: stroke.points)
             
             individualStroke.currentStroke?.bezierPoints.forEach {
                 $0.root.isEnabled = false
@@ -296,6 +282,21 @@ class PaintingCanvas {
             individualStroke.currentStroke = nil
             
             individualStrokeDic[uuid] = individualStroke
+        }
+    }
+    
+    /// ストロークを消しゴムで選択するためのコライダーを点列に沿って配置する
+    private func addEraserColliders(strokeId: UUID, points: [SIMD3<Float>]) {
+        for (index, point) in points.enumerated() where index % 5 == 0 {
+            let entity = eraserEntity.clone(recursive: true)
+            entity.name = "clear"
+            var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
+            invisibleMaterial.opacityThreshold = 1.0
+            entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
+            entity.components.set(StrokeRootComponent(strokeId))
+            entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
+            entity.position = point
+            root.addChild(entity)
         }
     }
     
@@ -372,21 +373,7 @@ class PaintingCanvas {
                 // 既存のEraserEntityを削除
                 root.children.removeAll(where: { $0.name == "clear" && $0.components[StrokeRootComponent.self]?.uuid == stroke.uuid })
                 
-                var count = 0
-                for point in stroke.points {
-                    if count % 5 == 0 {
-                        let entity = eraserEntity.clone(recursive: true)
-                        entity.name = "clear"
-                        var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
-                        invisibleMaterial.opacityThreshold = 1.0
-                        entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
-                        entity.components.set(StrokeRootComponent(stroke.uuid))
-                        entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
-                        entity.position = point
-                        root.addChild(entity)
-                    }
-                    count += 1
-                }
+                addEraserColliders(strokeId: stroke.uuid, points: stroke.points)
             }
         }
     }
@@ -415,21 +402,7 @@ class PaintingCanvas {
         }
 //        gridPoints.addPoints(from: newStroke.bezierPoints)
         
-        var count = 0
-        for point in stroke.points {
-            if count % 5 == 0 {
-                let entity = eraserEntity.clone(recursive: true)
-                entity.name = "clear"
-                var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
-                invisibleMaterial.opacityThreshold = 1.0
-                entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
-                entity.components.set(StrokeRootComponent(stroke.uuid))
-                entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
-                entity.position = point
-                root.addChild(entity)
-            }
-            count += 1
-        }
+        addEraserColliders(strokeId: stroke.uuid, points: stroke.points)
         
         newStroke.bezierPoints.forEach {
             $0.root.isEnabled = false
@@ -527,21 +500,7 @@ extension PaintingCanvas {
             strokes.append(newStroke)
             root.addChild(newStroke.root)
             
-            var count = 0
-            for point in stroke.points {
-                if count % 5 == 0 {
-                    let entity = eraserEntity.clone(recursive: true)
-                    entity.name = "clear"
-                    var invisibleMaterial = UnlitMaterial(color: UIColor(white: 1.0, alpha: 1.0))
-                    invisibleMaterial.opacityThreshold = 1.0
-                    entity.components.set(ModelComponent(mesh: .generateSphere(radius: 0.01), materials: [invisibleMaterial]))
-                    entity.components.set(StrokeRootComponent(uuid))
-                    entity.setScale([0.0025, 0.0025, 0.0025], relativeTo: nil)
-                    entity.position = point
-                    root.addChild(entity)
-                }
-                count += 1
-            }
+            addEraserColliders(strokeId: uuid, points: stroke.points)
             newStrokes.append(newStroke)
         }
         
