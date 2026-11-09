@@ -102,16 +102,13 @@ struct ExternalStrokeView: View {
                 
                 // ロードしたデータの確定
                 Button("Confirm Loaded Stroke") {
-                    appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
-                    for (id,affineMatrix): (Int, simd_float4x4) in appModel.rpcModel.coordinateTransforms.affineMatrixs {
-                        let transformedStrokes: [BezierStrokeData] = appModel.rpcModel.painting.paintingCanvas.tmpStrokes.map { $0.transferData(affine: affineMatrix) }
-                        _ = appModel.rpcModel.sendRequest(
-                            .init(
-                                peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
-                                method: .addBezierStrokes,
-                                param: .addBezierStrokes(.init(strokes: transformedStrokes))
-                            ),
-                            mcPeerId: id
+                    let confirmedStrokes: [BezierStroke] = appModel.rpcModel.painting.paintingCanvas.confirmTmpStrokes()
+                    appModel.rpcModel.sendRequestToPeers { (affineMatrix: simd_float4x4) -> RequestSchema in
+                        let transformedStrokes: [BezierStrokeData] = confirmedStrokes.map { $0.transferData(affine: affineMatrix) }
+                        return RequestSchema(
+                            peerId: appModel.mcPeerIDUUIDWrapper.mine.hash,
+                            method: .addBezierStrokes,
+                            param: .addBezierStrokes(.init(strokes: transformedStrokes))
                         )
                     }
                     appModel.rpcModel.painting.paintingCanvas.clearTmpStrokes()

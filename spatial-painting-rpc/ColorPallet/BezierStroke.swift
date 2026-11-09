@@ -10,14 +10,6 @@ import SwiftUI
 import RealityKit
 import simd
 
-struct StrokeComponent: Component {
-    var uuid: UUID
-    
-    init(_ uuid: UUID) {
-        self.uuid = uuid
-    }
-}
-
 struct StrokeRootComponent: Component {
     var uuid: UUID
     
@@ -27,62 +19,93 @@ struct StrokeRootComponent: Component {
 }
 
 
+/// ストロークの Entity の操作をまとめたラッパー
+///
+/// - Note: データの実体は `StrokeGeometry` と Component にある。
+///   Phase 3 までの移行措置で、呼び出し元が Component を直接扱うようになったら削除する
 @MainActor
-@Observable
-class BezierStroke {
-    var uuid: UUID
+final class BezierStroke {
+    let uuid: UUID
     
-    var activeColor: SimpleMaterial.Color = SimpleMaterial.Color.red
+    /// The stroke that represents the stroke.
+    let root: Entity
+    let stroke: Entity
+    
+    let geometry: StrokeGeometry
+    
+    var activeColor: SimpleMaterial.Color {
+        get { style.color }
+        set { style.color = newValue }
+    }
     
     func setActiveColor(color: SimpleMaterial.Color) {
         activeColor = color
     }
     
     /// ベジェ編集中など、線の内側を見せるために表面をカリングするかどうか
-    var isFaceCullingEnabled: Bool = false
-    
-    /// 現在の色とカリング設定を反映したマテリアルを生成する
-    func makeMaterial() -> SimpleMaterial {
-        var material = SimpleMaterial(color: activeColor, roughness: 1.0, isMetallic: false)
-        if isFaceCullingEnabled {
-            material.faceCulling = .front
-        }
-        return material
+    var isFaceCullingEnabled: Bool {
+        get { style.isFaceCullingEnabled }
+        set { style.isFaceCullingEnabled = newValue }
     }
     
-    /// The stroke that represents the stroke.
-    var root = Entity()
-    var stroke = Entity()
-    
     /// The collection of points in 3D space that represent the stroke.
-    var points: [SIMD3<Float>] = []
+    var points: [SIMD3<Float>] {
+        get { geometry.points }
+        set { geometry.points = newValue }
+    }
     
     /// The maximum radius of the stroke.
-    var maxRadius: Float = 1E-2
+    var maxRadius: Float {
+        get { style.maxRadius }
+        set { style.maxRadius = newValue }
+    }
     
     func setMaxRadius(radius: Float) {
         maxRadius = radius
     }
     
-    var tmpBezier: BezierPoint
-    
-    var bezierPoints: [BezierPoint] = []
+    var bezierPoints: [BezierPointData] {
+        get { geometry.bezierPoints }
+        set { geometry.bezierPoints = newValue }
+    }
     
     /// 元の maxRadius を保持するプロパティを追加（初期値 1E-2）
     var originalMaxRadius: Float {
         return 1E-2
     }
     
-    /// The number of points in each ring of the mesh.
-    let pointsPerRing = 4
+    private var style: StrokeStyleComponent {
+        get { root.components[StrokeStyleComponent.self]! }
+        set { root.components.set(newValue) }
+    }
     
-    init(uuid: UUID, originalMaxRadius: Float = 1E-2) {
+    init(uuid: UUID, points: [SIMD3<Float>], color: SimpleMaterial.Color, maxRadius: Float) {
         self.uuid = uuid
-        self.maxRadius = originalMaxRadius
-        self.tmpBezier = BezierPoint(strokeId: uuid)
-        stroke.components.set(StrokeComponent(uuid))
+        self.root = Entity()
+        self.stroke = Entity()
+        self.geometry = StrokeGeometry(points: points)
+        stroke.components.set(StrokeMeshComponent())
+        root.components.set(StrokeComponent(id: uuid, geometry: geometry))
+        root.components.set(StrokeStyleComponent(color: color, maxRadius: maxRadius))
         root.components.set(StrokeRootComponent(uuid))
         root.addChild(stroke)
+    }
+    
+    /// `StrokeComponent` を持つ Entity から生成する
+    init?(entity: Entity) {
+        guard let component: StrokeComponent = entity.components[StrokeComponent.self],
+              entity.components.has(StrokeStyleComponent.self),
+              let stroke: Entity = entity.children.first(where: { $0.components.has(StrokeMeshComponent.self) }) else {
+            return nil
+        }
+        self.uuid = component.id
+        self.root = entity
+        self.stroke = stroke
+        self.geometry = component.geometry
+    }
+    
+    convenience init(uuid: UUID, originalMaxRadius: Float = 1E-2) {
+        self.init(uuid: uuid, points: [], color: .red, maxRadius: originalMaxRadius)
     }
     
     //修正 by nagao 2025/7/15
@@ -96,67 +119,20 @@ class BezierStroke {
         self.updateMesh(false)
     }
     
-    /// Update the mesh with the points of the stroke if it already exists,
-    /// or create a new one with the given mesh data.
+    /// メッシュの再生成を `StrokeMeshSystem` に依頼する
+    ///
+    /// - Note: `flag` が true のときは `points` の再サンプリングとメッシュの Transform の設定まで同期的に行う。
+    ///   呼び出し元が直後に `points` を読んだり、親を付け替えたりするため
     func updateMesh(_ flag: Bool = true) {
         if flag {
-            if !bezierPoints.beziers.isEmpty {
-                points = beziers2Points(beziers: bezierPoints.beziers, resolution: 16)
-            }
+            geometry.resamplePoints()
         }
 
         /// The starting point where the stroke mesh begins.
-        guard let center = points.first,
-              let last = points.last else { return }
+        guard let center = points.first else { return }
 
-        if flag {
-            /// 最後の点を追加
-            if !bezierPoints.beziers.isEmpty {
-                points.append(last)
-            }
-        }
+        root.components.set(StrokeMeshDirty())
 
-        /// The position, normals, and triangle indices that the points generate.
-        let (positions, normals, triangles) = generateMeshData()
-        
-        /// The `MeshResource.Contents` instance.
-        var contents = MeshResource.Contents()
-        
-        // Create and assign an instance to `contents`.
-        contents.instances = [MeshResource.Instance(id: "main", model: "model")]
-        
-        // Create the part for the model, and set the vertex positions, triangle indices, and normals.
-        var part = MeshResource.Part(id: "part", materialIndex: 0)
-        part.positions = MeshBuffer(positions)
-        part.triangleIndices = MeshBuffer(triangles)
-        part.normals = MeshBuffer(normals)
-        
-        // Create and assign a model that consists of the `part`.
-        contents.models = [MeshResource.Model(id: "model", parts: [part])]
-        
-        // Replace the mesh with `contents` if there is a mesh component on the stroke.
-        if let mesh = stroke.model?.mesh {
-            do {
-                try mesh.replace(with: contents)
-                // マテリアルを更新 added by nagao 2025/11/21
-                stroke.model?.materials = [makeMaterial()]
-            } catch {
-                print("Error replacing mesh: \(error.localizedDescription)")
-            }
-        } else {
-            /// The new mesh that generates with `content`.
-            guard let mesh = try? MeshResource.generate(from: contents) else {
-                print("Error generating mesh")
-                return
-            }
-            
-            // Set the model component to the new mesh, and assign a simple material.
-            stroke.components.set(ModelComponent(
-                mesh: mesh,
-                materials: [makeMaterial()]
-            ))
-        }
-        
         if flag {
             // Set the stroke's transform and position.
             stroke.setTransformMatrix(.identity, relativeTo: nil)
@@ -164,258 +140,63 @@ class BezierStroke {
         }
     }
     
-    func updateMeshEnableFaceCulling() {
-        isFaceCullingEnabled = true
-        if !bezierPoints.beziers.isEmpty {
-            points = beziers2Points(beziers: bezierPoints.beziers, resolution: 8)
-        }
-
-        /// The starting point where the stroke mesh begins.
-        guard let center = points.first,
-              let last = points.last else { return }
-        
-        
-        /// 最後の点を追加
-        if !bezierPoints.beziers.isEmpty {
-            points.append(last)
-        }
-        
-        /// The position, normals, and triangle indices that the points generate.
-        let (positions, normals, triangles) = generateMeshData()
-        
-        /// The `MeshResource.Contents` instance.
-        var contents = MeshResource.Contents()
-        
-        // Create and assign an instance to `contents`.
-        contents.instances = [MeshResource.Instance(id: "main", model: "model")]
-        
-        // Create the part for the model, and set the vertex positions, triangle indices, and normals.
-        var part = MeshResource.Part(id: "part", materialIndex: 0)
-        part.positions = MeshBuffer(positions)
-        part.triangleIndices = MeshBuffer(triangles)
-        part.normals = MeshBuffer(normals)
-        
-        // Create and assign a model that consists of the `part`.
-        contents.models = [MeshResource.Model(id: "model", parts: [part])]
-        
-        /// The new mesh that generates with `content`.
-        guard let mesh = try? MeshResource.generate(from: contents) else {
-            print("Error generating mesh")
-            return
-        }
-        
-        // Set the model component to the new mesh, and assign a simple material.
-        stroke.components.set(ModelComponent(
-            mesh: mesh,
-            materials: [makeMaterial()]
-        ))
-        
-        // Set the stroke's transform and position.
-        stroke.setTransformMatrix(.identity, relativeTo: nil)
-        stroke.setPosition(center, relativeTo: nil)
+    /// 消しゴム用コライダーの再生成を `StrokeColliderSystem` に依頼する
+    func updateColliders() {
+        root.components.set(StrokeColliderDirty())
     }
     
-    func updateMeshDisableFaceCulling() {
-        isFaceCullingEnabled = false
-        if !bezierPoints.beziers.isEmpty {
-            points = beziers2Points(beziers: bezierPoints.beziers, resolution: 8)
-        }
-
-        /// The starting point where the stroke mesh begins.
-        guard let center = points.first,
-              let last = points.last else { return }
-        
-        
-        /// 最後の点を追加
-        if !bezierPoints.beziers.isEmpty {
-            points.append(last)
-        }
-        
-        /// The position, normals, and triangle indices that the points generate.
-        let (positions, normals, triangles) = generateMeshData()
-        
-        /// The `MeshResource.Contents` instance.
-        var contents = MeshResource.Contents()
-        
-        // Create and assign an instance to `contents`.
-        contents.instances = [MeshResource.Instance(id: "main", model: "model")]
-        
-        // Create the part for the model, and set the vertex positions, triangle indices, and normals.
-        var part = MeshResource.Part(id: "part", materialIndex: 0)
-        part.positions = MeshBuffer(positions)
-        part.triangleIndices = MeshBuffer(triangles)
-        part.normals = MeshBuffer(normals)
-        
-        // Create and assign a model that consists of the `part`.
-        contents.models = [MeshResource.Model(id: "model", parts: [part])]
-        
-        /// The new mesh that generates with `content`.
-        guard let mesh = try? MeshResource.generate(from: contents) else {
-            print("Error generating mesh")
-            return
-        }
-        
-        // Set the model component to the new mesh, and assign a simple material.
-        stroke.components.set(ModelComponent(
-            mesh: mesh,
-            materials: [makeMaterial()]
-        ))
-        
-        // Set the stroke's transform and position.
-        stroke.setTransformMatrix(.identity, relativeTo: nil)
-        stroke.setPosition(center, relativeTo: nil)
-    }
-            
-    func points2MeshContents(poitns: [SIMD3<Float>]) -> MeshResource.Contents {
-        /// The position, normals, and triangle indices that the points generate.
-        let (positions, normals, triangles) = generateMeshData()
-        
-        /// The `MeshResource.Contents` instance.
-        var contents = MeshResource.Contents()
-        
-        // Create and assign an instance to `contents`.
-        contents.instances = [MeshResource.Instance(id: "main", model: "model")]
-        
-        // Create the part for the model, and set the vertex positions, triangle indices, and normals.
-        var part = MeshResource.Part(id: "part", materialIndex: 0)
-        part.positions = MeshBuffer(positions)
-        part.triangleIndices = MeshBuffer(triangles)
-        part.normals = MeshBuffer(normals)
-        
-        // Create and assign a model that consists of the `part`.
-        contents.models = [MeshResource.Model(id: "model", parts: [part])]
-        return contents
-    }
-    
-    // MARK: Helper functions
-    
-    /// Generate the mesh data with the current points.
-    private func generateMeshData() -> ([SIMD3<Float>], [SIMD3<Float>], [UInt32]) {
-        /// The array to store vertex positions.
-        var positions: [SIMD3<Float>] = []
-        
-        /// The array to store normal vectors.
-        var normals: [SIMD3<Float>] = []
-        
-        /// The array to store triangle indices.
-        var triangles: [UInt32] = []
-        
-        // Iterates through the points to create a path for the mesh.
-        for pointIdx in 0..<points.count {
-            /// The radius and direction for the current point.
-            let (radius, direction) = calculateRadiusAndDirection(at: pointIdx)
-            
-            /// The x and y axes for the current point.
-            let (xAxis, yAxis) = calculateAxes(direction: direction)
-            
-            // Generate points around the current stroke point.
-            for point in 0..<pointsPerRing {
-                /// The position and normal for the current point in the ring.
-                let (position, normal) = calculatePositionAndNormal(pointI: pointIdx, point: point, radius: radius, xAxis: xAxis, yAxis: yAxis)
-                
-                // Attach the position to the positions collection.
-                positions.append(position)
-                
-                // Attach the normal to the normals collection.
-                normals.append(normal)
-                
-                // Generate a mesh between each point.
-                if pointIdx + 1 < points.count {
-                    appendTriangles(pointIdx: pointIdx, point: point, triangles: &triangles)
-                }
-            }
-        }
-        
-        return (positions, normals, triangles)
-    }
-    
-    /// Calculate the radius and direction from a given point index.
-    private func calculateRadiusAndDirection(at index: Int) -> (Float, SIMD3<Float>) {
-        // End the stroke if there are no points.
-        if index == 0 || (index + 1 == points.count) {
-            // For the first and last points, use zero radius and default direction.
-            return (0, SIMD3<Float>(1, 0, 0))
-        } else {
-            /// The difference between the current point and the previous point.
-            let diff = points[index] - points[index - 1]
-            
-            /// The radius calculated from the difference.
-            let radius = maxRadius * powf(clamp(Float(maxRadius / length(diff)), min: Float(0), max: Float(1)), 0.3)
-            
-            return (radius, normalize(diff))
+    /// 制御点の Entity 群
+    private var controlPointEntities: [Entity] {
+        root.children.filter { (entity: Entity) -> Bool in
+            return entity.components.has(BezierPointComponent.self)
         }
     }
     
-    /// Calculate the x and y axes with the given direction.
-    private func calculateAxes(direction: SIMD3<Float>) -> (SIMD3<Float>, SIMD3<Float>) {
-        /// The cross product of the direction and the y-axis that normalizes.
-        let xAxis = normalize(cross(direction, SIMD3<Float>(0, 1, 0)))
-        
-        /// The cross product of the direction and `xAxis` value that normalizes.
-        let yAxis = normalize(cross(direction, xAxis))
-        
-        return (xAxis, yAxis)
-    }
-    
-    /// Calculate the position and normal for a point in the ring around a stroke point.
-    private func calculatePositionAndNormal(
-        pointI: Int, point: Int, radius: Float, xAxis: SIMD3<Float>, yAxis: SIMD3<Float>) -> (SIMD3<Float>, SIMD3<Float>) {
-            /// The angle is the product of two times pi, then divide the total points per ring.
-            let angle: Float = 2 * .pi * Float(point) / Float(pointsPerRing)
-            
-            /// The current normal value from the angle.
-            let normal: SIMD3<Float> = cos(angle) * xAxis + sin(angle) * yAxis
-            
-            /// The location of the current point with its distance from the center point.
-            let position: SIMD3<Float> = (points[pointI] - points[0]) + radius * normal
-            
-            return (position, normal)
+    /// 制御点の Entity 群の表示を切り替える
+    func setControlPointsEnabled(_ isEnabled: Bool) {
+        for entity: Entity in controlPointEntities {
+            entity.isEnabled = isEnabled
         }
-    
-    /// Add triangle indices for the current point in the mesh.
-    private func appendTriangles(pointIdx: Int, point: Int, triangles: inout [UInt32]) {
-        let first: UInt32 = UInt32(pointsPerRing * (pointIdx) + (point) % pointsPerRing)
-        let second: UInt32 = UInt32(pointsPerRing * (pointIdx + 1) + (point) % pointsPerRing)
-        let third: UInt32 = UInt32(pointsPerRing * (pointIdx) + (point + 1) % pointsPerRing)
-        let fourth: UInt32 = UInt32(pointsPerRing * (pointIdx + 1) + (point + 1) % pointsPerRing)
-        let quadIndices: [UInt32] = [first, second, third, fourth]
-        
-        // Add the contents of the fourth, first, and third entry from the
-        // `quadIndices` array to the `triangles` collection.
-        triangles.append(contentsOf: [quadIndices[3], quadIndices[0], quadIndices[2]])
-        
-        // Add the contents of the fourth, second, and first entry from the
-        // `quadIndices` array to the `trinagles` collection.
-        triangles.append(contentsOf: [quadIndices[3], quadIndices[1], quadIndices[0]])
     }
     
-    // pointを変更しない
-    public init(uuid: UUID, points: [SIMD3<Float>] = [], color: SimpleMaterial.Color = .white, maxRadius: Float = 1E-2) {
-        self.uuid = uuid
-        self.tmpBezier = BezierPoint(strokeId: uuid)
-        self.points = points
-        self.activeColor = color
-        self.maxRadius = maxRadius
-        stroke.components.set(StrokeComponent(uuid))
-        root.components.set(StrokeRootComponent(uuid))
-        root.addChild(stroke)
+    /// `bezierPoints` から制御点の Entity 群を作り直す
+    ///
+    /// - Note: 作り直すと選択中の Entity が失われるので、編集中は `moveControlPoint` を使う
+    func rebuildControlPoints(endPoint: Entity, handle: Entity) {
+        for entity: Entity in controlPointEntities {
+            entity.removeFromParent()
+        }
+        for point: BezierPointData in bezierPoints {
+            let entity: Entity = BezierControlPointFactory.make(data: point, endPoint: endPoint, handle: handle)
+            entity.isEnabled = false
+            root.addChild(entity)
+        }
     }
     
-    public init(uuid: UUID, points: [SIMD3<Float>] = [], color: CGColor = .init(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), maxRadius: Float = 1E-2) {
-        self.uuid = uuid
-        self.tmpBezier = BezierPoint(strokeId: uuid)
-        self.points = points
-        self.activeColor = .init(cgColor: color)
-        self.maxRadius = maxRadius
-        stroke.components.set(StrokeComponent(uuid))
-        root.components.set(StrokeRootComponent(uuid))
-        root.addChild(stroke)
+    /// 制御点を移動して Entity の位置を同期する
+    func moveControlPoint(pointId: UUID, to position: SIMD3<Float>, pn: BezierPointType) {
+        guard let index: Int = bezierPoints.firstIndex(where: { $0.uuid == pointId }) else { return }
+        
+        geometry.bezierPoints[index].add(point: position, pn: pn)
+        
+        let entity: Entity? = controlPointEntities.first { (entity: Entity) -> Bool in
+            return entity.components[BezierPointComponent.self]?.pointId == pointId
+        }
+        if let entity: Entity {
+            BezierControlPointFactory.sync(entity, with: geometry.bezierPoints[index])
+        }
+    }
+    
+    /// ベジェ編集中など、線の内側を見せるためのカリングを切り替える
+    func setFaceCulling(_ isEnabled: Bool) {
+        isFaceCullingEnabled = isEnabled
+        updateMesh()
     }
     
     /// 通信・ファイル保存用のデータから生成する
     convenience init(data: BezierStrokeData) {
         self.init(uuid: data.uuid, points: data.points, color: data.color.uiColor, maxRadius: data.maxRadius)
-        self.bezierPoints = data.bezierPoints.map { BezierPoint(data: $0) }
+        self.bezierPoints = data.bezierPoints
     }
     
     /// 通信・ファイル保存用のデータ
@@ -425,7 +206,7 @@ class BezierStroke {
             points: points,
             color: .init(activeColor),
             maxRadius: maxRadius,
-            bezierPoints: bezierPoints.map(\.data)
+            bezierPoints: bezierPoints
         )
     }
     

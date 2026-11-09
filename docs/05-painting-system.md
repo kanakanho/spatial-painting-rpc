@@ -24,146 +24,133 @@ Spatial Painting RPCのペイントシステムは、3D空間でのリアルタ�
 │  ┌─────────────────────▼──────────────────────────────┐  │
 │  │              Stroke Management                     │  │
 │  │                                                    │  │
-│  │ - Stroke オブジェクト                              │  │
-│  │ - StrokePoint 管理                                 │  │
-│  │ - リアルタイムメッシュ生成                          │  │
-│  │ - 物理コンポーネント統合                            │  │
+│  │ - Stroke / Painter の Entity と Component          │  │
+│  │ - StrokeGeometry による形状データの管理            │  │
+│  │ - System によるメッシュとコライダーの生成          │  │
+│  │ - 制御点の選択と強調表示                            │  │
 │  └────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────┘
 ```
 
-## PaintingCanvas
+## ストロークの ECS 構成
 
-### 概要
-`PaintingCanvas` は3D空間でのペイント機能の中核を担うクラスです。ストロークの管理、メッシュ生成、物理演算を統合的に処理します。
+ストロークと描画の状態は、RealityKit の Entity と Component で管理します。`PaintingCanvas` は Entity ツリーを操作する入口で、ストロークの配列は持ちません。
 
-### クラス定義
-```swift
-class PaintingCanvas {
-    // メインエンティティ
-    let root = Entity()                    // ルートエンティティ
-    let tmpRoot = Entity()                 // 一時的なルート
-    
-    // ストローク管理
-    var strokes: [Stroke] = []             // 確定済みストローク
-    var tmpStrokes: [Stroke] = []          // 一時ストローク
-    var currentStroke: Stroke?             // 現在のストローク
-    
-    // バウンディングボックス
-    var tmpBoundingBoxEntity: Entity = Entity()
-    var tmpBoundingBox: BoundingBoxCube = BoundingBoxCube()
-    var boundingBoxEntity: ModelEntity = ModelEntity()
-    var boundingBoxCenter: SIMD3<Float> = .zero
-    
-    // 消しゴム機能
-    var eraserEntity: Entity = Entity()
-    
-    // 描画設定
-    var activeColor = SimpleMaterial.Color.white
-    var maxRadius: Float = 1E-2
-    var currentPosition: SIMD3<Float> = .zero
-    var isFirstStroke = true
-    
-    // 衝突検出用ボックス
-    let big: Float = 1E2      // 正方向の距離
-    let small: Float = 1E-2   // 負方向の距離
-}
+### Entity の構成
+
 ```
+Canvas root（StrokeAssetsComponent, ControlPointSelectionComponent）
+├─ 衝突ボックス × 6
+├─ Stroke root（StrokeComponent, StrokeStyleComponent, StrokeRootComponent）× n
+│  ├─ Mesh（StrokeMeshComponent, ModelComponent）
+│  ├─ Point root（BezierPointComponent）× n
+│  │  ├─ end / startHandle / endHandle（BezierStrokeControlComponent）
+│  │  └─ line（BezierControlLineComponent）
+│  └─ Collider（StrokeColliderComponent）
+├─ tmpRoot
+│  └─ boundingBoxEntity（StrokeGroupComponent）
+│     └─ 一時ストロークの Stroke root × n
+└─ paintersRoot
+   └─ Painter（PainterComponent, BrushComponent, DraftStrokeComponent）× ユーザー数
+```
+
+`PaintingCanvas.strokes` と `tmpStrokes` は、参照のたびに Entity ツリーから導出します。データ源は Entity ツリーだけです。
+
+### Component
+
+| Component | 持たせる Entity | 役割 |
+|---|---|---|
+| `StrokeComponent` | Stroke root | ID と `StrokeGeometry` への参照 |
+| `StrokeStyleComponent` | Stroke root | 色、太さ、カリング |
+| `StrokeRootComponent` | Stroke root | ストロークの UUID |
+| `StrokeMeshComponent` | Mesh | メッシュを持つ子 Entity の目印 |
+| `StrokeColliderComponent` | Collider | 消しゴムと選択の当たり判定 |
+| `BezierPointComponent` | Point root | 制御点の ID |
+| `BezierStrokeControlComponent` | end / handle | 操作対象の制御点 |
+| `BezierControlLineComponent` | line | ハンドルを結ぶ線の目印 |
+| `StrokeGroupComponent` | `boundingBoxEntity` | 編集モードで選択した元のストローク |
+| `PainterComponent` | Painter | ユーザー ID |
+| `BrushComponent` | Painter | ユーザーの色と太さ |
+| `DraftStrokeComponent` | Painter | 描画中のストロークと飛びの判定 |
+| `ControlPointSelectionComponent` | Canvas root | 選択中の制御点と操作の基準位置 |
+| `SelectedControlPointComponent` | end / handle | 選択中の目印 |
+| `StrokeAssetsComponent` | Canvas root | 複製元のプロトタイプ。System へ依存を渡す手段 |
+
+### StrokeGeometry
+
+`points` と `bezierPoints` の実体は `StrokeGeometry` クラスに置き、`StrokeComponent` は参照だけを持ちます。
+
+点列を Component の値で持つと、取り出して変更するたびに配列全体がコピーされます。クラスに置くと、その場で追記できます。`StrokeGeometry` はストロークごとに持つので、寿命は Entity に従います。
+
+`points` は描画中は入力で、ベジェ化のあとは `bezierPoints` からの派生データです。再サンプリングは `resamplePoints()` にまとめています。
+
+- `BezierStroke.points` の `append` は配列全体をコピーするので、点の追加は `geometry.points` へ直接行う
+- `geometry` が共有されるので、Stroke の Entity は `clone` しない
+
+### System と Dirty タグ
+
+| System | タグ | 処理 |
+|---|---|---|
+| `StrokeMeshSystem` | `StrokeMeshDirty` | `StrokeMeshBuilder` でメッシュを生成し、マテリアルを更新する |
+| `StrokeColliderSystem` | `StrokeColliderDirty` | コライダーを作り直す。1 つの Entity に、点 5 個ごとに箱の形状を並べる |
+| `ControlPointHighlightSystem` | `ControlPointAppearanceDirty` | 選択状態に合わせて制御点の見た目を更新する |
+
+更新が必要な Entity に Dirty タグを付けると、次のフレームで System が 1 回だけ処理します。1 フレームに複数の点が届いても、メッシュの生成は 1 回で済みます。
+
+### 消しゴム用コライダー
+
+コライダーはストロークごとに 1 つの Entity で、点 5 個ごとに一辺 2.5 cm の箱の形状を並べた `CollisionComponent` を持ちます。
+
+判定の設定（mode、group、mask）とジェスチャーの対象であることは、Reality Composer Pro の `collider` から `CollisionComponent` と `InputTargetComponent` を複製して引き継ぎます。以前は点ごとにプロトタイプの Entity を複製していましたが、1 フレームに数十 ms かかりフレーム落ちの原因になっていたので、この方式に変えました。
+
+点が重なっている区間では、指が触れている間に `CollisionEvents.Began` が届くのは 1 回だけです。消しゴムと選択は最初の Began で処理するので、動作は変わりません。
+
+### 同期処理のまま残すもの
+
+次の処理は System に移しません。
+
+| 処理 | 理由 |
+|---|---|
+| `points` と `bezierPoints` の更新、再サンプリング | 直後に `finishControlPoint` や `transferData` が読む。RPC の順序も保つ |
+| メッシュの子 Entity の Transform の設定 | `addTmpStrokes` が直後に親を付け替える |
+| 制御点の Entity の位置の同期 | ジェスチャーの終了時に位置を読む |
+| Painter の更新 | `addStrokePoint`、`addBezierStrokePoints`、`finishStroke` は順序に意味がある |
+| 入力処理 | System にしても描画の利点がなく、遅延と点の間隔の変化が生じる |
+
+System は Scene の中の Entity しか処理しません。ImmersiveSpace を閉じている間の Dirty タグは残り、次に開いたときに処理されます。
+
+### BezierStroke
+
+`BezierStroke` は Stroke の Entity を操作するための薄いラッパーです。独自の状態を持たないので、同一性は `uuid` で比較します。入力処理と RPC の送信が利用しています。
+
+## PaintingCanvas
 
 ### 主要メソッド
 
-#### 1. addStrokePoint(_:_:)
-新しいストロークポイントを追加します。
+| メソッド | 処理 |
+|---|---|
+| `addPoint(_:_:userId:)` | ユーザーの描画中のストロークに点を追加する |
+| `addBezierStrokePoints(userId:bezierPoints:)` | 描画中のストロークにベジェの制御点を設定する |
+| `individualPoints2Bezier(userId:)` | 描画中のストロークをベジェ化する |
+| `finishStroke(_:)` | 描画中のストロークを確定する。8 点未満なら削除する |
+| `setActiveColor(userId:color:)` / `setMaxRadius(userId:radius:)` | ユーザーの筆を設定する |
+| `addBezierStrokes(_:)` | 外部のストロークを追加する（RPC 経由） |
+| `addTmpStrokes(_:)` | 一時ストロークをグループに追加する |
+| `confirmTmpStrokes()` | 一時ストロークを確定し、新しいストロークを返す |
+| `addMovingStroke(_:)` / `confirmMovingStrokes()` | 編集モードの選択と確定 |
+| `selectControlPoint(_:)` / `clearControlPointSelection()` | 制御点の選択 |
 
-```swift
-func addStrokePoint(_ position: SIMD3<Float>, radius: Float)
-```
+### 描画の判定
 
-**処理フロー:**
-1. 現在のストロークが存在しない場合、新しいストロークを作成
-2. ストロークポイントを追加
-3. リアルタイムでメッシュを更新
+`DraftStrokeComponent.step` が次の点の扱いを決めます。
 
-#### 2. finishStroke()
-現在のストロークを完了します。
-
-```swift
-func finishStroke()
-```
-
-**処理フロー:**
-1. 現在のストロークを確定済みリストに移動
-2. 一時的なエンティティをクリーンアップ
-3. 最終的なメッシュを生成
-
-#### 3. setActiveColor(_:)
-アクティブな描画色を設定します。
-
-```swift
-func setActiveColor(color: UIColor)
-```
-
-#### 4. setMaxRadius(_:)
-描画の最大半径（線の太さ）を設定します。
-
-```swift
-func setMaxRadius(radius: Float)
-```
-
-#### 5. addStrokes(_:)
-外部から複数のストロークを一括追加します（RPC経由）。
-
-```swift
-func addStrokes(_ strokes: [Stroke])
-```
+1. 最初の点は無視する
+2. 前の点から 0.1 m 以上離れていたら、手の位置が飛んだとみなし、描画中のストロークを手放す
+3. それ以外はストロークに追加する
 
 ### 物理演算統合
-キャンバスは6つの衝突ボックスで構成され、3D空間全体をカバーします。
 
-```swift
-// 初期化時に衝突ボックスを設定
-root.addChild(addBox(size: [big, big, small], position: [0, 0, -0.5 * big]))  // 前後
-root.addChild(addBox(size: [big, big, small], position: [0, 0, +0.5 * big]))
-root.addChild(addBox(size: [big, small, big], position: [0, -0.5 * big, 0]))  // 上下
-root.addChild(addBox(size: [big, small, big], position: [0, +0.5 * big, 0]))
-root.addChild(addBox(size: [small, big, big], position: [-0.5 * big, 0, 0]))  // 左右
-root.addChild(addBox(size: [small, big, big], position: [+0.5 * big, 0, 0]))
-```
-
-## Stroke クラス
-
-### 概要
-`Stroke` は個々のペイントストロークを表現するクラスです。ストロークポイントの管理とメッシュ生成を担当します。
-
-### クラス定義
-```swift
-class Stroke {
-    // 識別子
-    var id = UUID()
-    
-    // ストロークポイント
-    var strokePoints: [StrokePoint] = []
-    
-    // 描画設定
-    var color: UIColor = .white
-    var radius: Float = 1E-2
-    
-    // RealityKit エンティティ
-    var entity: ModelEntity?
-    
-    // 状態管理
-    var isFinished: Bool = false
-}
-```
-
-### StrokePoint
-```swift
-struct StrokePoint {
-    let position: SIMD3<Float>     // 3D座標
-    let radius: Float              // その点での半径
-    let timestamp: Date            // タイムスタンプ
-}
-```
+キャンバスは 6 つの衝突ボックスで構成され、3D 空間全体をカバーします。ボックスの生成は `addCanvasBoxes()` にまとめています。
 
 ## AdvancedColorPalletModel
 

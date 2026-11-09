@@ -298,6 +298,15 @@ class RPCModel: ObservableObject {
         return rpcResult
     }
     
+    /// 全ての Peer に、それぞれの座標系へ変換したリクエストを送信する
+    ///
+    /// - Parameter makeRequest: 送信先の座標系へのアフィン行列からリクエストを生成する
+    func sendRequestToPeers(_ makeRequest: (simd_float4x4) -> RequestSchema) {
+        for (id, affineMatrix) in coordinateTransforms.affineMatrixs {
+            _ = sendRequest(makeRequest(affineMatrix), mcPeerId: id)
+        }
+    }
+    
     /// 受信した RPC の実行
     /// - Parameters: request: `RequestSchema`
     /// - Returns: `RPCResult`
