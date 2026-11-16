@@ -16,9 +16,7 @@ class ViewModel {
     
     var session = ARKitSession()
     var handTracking = HandTrackingProvider()
-    var sceneReconstruction = SceneReconstructionProvider()
     
-    private var meshEntities = [UUID: ModelEntity]()
     var contentEntity = Entity()
     var initBallEntity = Entity()
     var latestHandTracking: HandsUpdates = .init(left: nil, right: nil)
@@ -377,34 +375,6 @@ class ViewModel {
         colorPalletModel.selectedToolName = toolName
     }
     
-    
-    func processReconstructionUpdates() async {
-        for await update in sceneReconstruction.anchorUpdates {
-            let meshAnchor = update.anchor
-            
-            guard let shape = try? await ShapeResource.generateStaticMesh(from: meshAnchor) else { continue }
-            switch update.event {
-            case .added:
-                let entity = ModelEntity()
-                entity.transform = Transform(matrix: meshAnchor.originFromAnchorTransform)
-                entity.collision = CollisionComponent(shapes: [shape], isStatic: true)
-                entity.components.set(InputTargetComponent())
-                
-                // mode が dynamic でないと物理演算が適用されない
-                entity.physicsBody = PhysicsBodyComponent(mode: .dynamic)
-                
-                meshEntities[meshAnchor.id] = entity
-                contentEntity.addChild(entity)
-            case .updated:
-                guard let entity = meshEntities[meshAnchor.id] else { continue }
-                entity.transform = Transform(matrix: meshAnchor.originFromAnchorTransform)
-                entity.collision?.shapes = [shape]
-            case .removed:
-                meshEntities[meshAnchor.id]?.removeFromParent()
-                meshEntities.removeValue(forKey: meshAnchor.id)
-            }
-        }
-    }
     
     func processHandUpdates() async {
         for await update in handTracking.anchorUpdates {

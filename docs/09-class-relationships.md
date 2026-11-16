@@ -79,8 +79,6 @@ ViewModel (AR/VRシーン管理)
 ├── colorPalletModel: AdvancedColorPalletModel
 ├── session: ARKitSession
 ├── handTracking: HandTrackingProvider
-├── sceneReconstruction: SceneReconstructionProvider
-├── meshEntities: [UUID: ModelEntity]
 ├── contentEntity: Entity
 ├── leftHandEntity: Entity
 └── rightHandEntity: Entity
@@ -133,21 +131,21 @@ Painting
 
 PaintingCanvas
 ├── root: Entity
-├── strokes: [Stroke]
-├── tmpStrokes: [Stroke]
-├── currentStroke: Stroke?
+├── tmpRoot: Entity
+├── paintersRoot: Entity
 ├── boundingBoxEntity: ModelEntity
-├── eraserEntity: Entity
-├── activeColor: SimpleMaterial.Color
-└── maxRadius: Float
+├── strokes: [BezierStroke]（Entity ツリーから導出）
+└── tmpStrokes: [BezierStroke]（Entity ツリーから導出）
 
-Stroke
-├── id: UUID
-├── strokePoints: [StrokePoint]
-├── color: UIColor
-├── radius: Float
-├── entity: ModelEntity?
-└── isFinished: Bool
+BezierStroke（Entity のラッパー）
+├── uuid: UUID
+├── root: Entity
+├── stroke: Entity
+└── geometry: StrokeGeometry
+
+StrokeGeometry
+├── points: [SIMD3<Float>]
+└── bezierPoints: [BezierPointData]
 
 AdvancedColorPalletModel
 ├── colorPalletEntity: Entity

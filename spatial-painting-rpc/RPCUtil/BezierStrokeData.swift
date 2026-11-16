@@ -8,17 +8,56 @@
 import Foundation
 import simd
 
+/// ベジェの制御点の種類
+enum BezierPointType: CaseIterable, Codable, Sendable {
+    case end
+    case startControl
+    case endControl
+}
+
 /// 通信・ファイル保存用のベジェの制御点
 ///
-/// - Note: `BezierStroke.BezierPoint` は RealityKit の Entity を持つため MainActor でしか扱えない。
-///   RPC のエンコード・デコードをメインスレッド外で行えるように、値だけを持つこの型で送受信する。
-///   JSON のキーは `BezierStroke.BezierPoint` の旧 Codable 実装と同じ。
+/// - Note: JSON のキーは `BezierStroke.BezierPoint` の旧 Codable 実装と同じ。
 struct BezierPointData: Codable, Sendable {
     let uuid: UUID
     let strokeId: UUID
-    var end: SIMD3<Float>?
-    var startControl: SIMD3<Float>?
-    var endControl: SIMD3<Float>?
+    var end: SIMD3<Float>? = nil
+    var startControl: SIMD3<Float>? = nil
+    var endControl: SIMD3<Float>? = nil
+
+    /// 点を指定した種類の位置に設定する
+    ///
+    /// - Note: `end` が未設定のときは `.end` のみ受け付ける。ハンドルの片方を動かすと反対側は `end` を中心に点対称に動き、
+    ///   `end` を動かすと両方のハンドルが追従する
+    /// - Parameters:
+    ///   - point: 設定する点の座標
+    ///   - pn: 設定する点の種類
+    mutating func add(point: SIMD3<Float>, pn: BezierPointType) {
+        guard let end = end else {
+            if pn == .end {
+                self.end = point
+            }
+            return
+        }
+        
+        switch pn {
+        case .endControl:
+            endControl = point
+            startControl = end + (end - point)
+        case .startControl:
+            startControl = point
+            endControl = end + (end - point)
+        case .end:
+            let diff = end - point
+            self.end = point
+            
+            if let startControl = startControl,
+               let endControl = endControl {
+                self.startControl = startControl - diff
+                self.endControl = endControl - diff
+            }
+        }
+    }
 
     /// 全ての点にアフィン変換を適用する
     func applying(_ affine: simd_float4x4) -> BezierPointData {
@@ -27,6 +66,72 @@ struct BezierPointData: Codable, Sendable {
         data.startControl = startControl.map { matmul4x4_3x1(affine, $0) }
         data.endControl = endControl.map { matmul4x4_3x1(affine, $0) }
         return data
+    }
+}
+
+extension [BezierPointData] {
+    /// アフィン変換を適用した送信用のデータ
+    func transferData(affine: simd_float4x4) -> [BezierPointData] {
+        return self.map { $0.applying(affine) }
+    }
+    
+    /// 連続する 2 つの制御点から作る 3 次ベジェのセグメント
+    var beziers: [[SIMD3<Float>]] {
+        var beziers: [[SIMD3<Float>]] = []
+        
+        if self.count < 2 { return beziers }
+        
+        // 2つの BezierPointData から それぞれ end,control を取得して、4つのリストにする
+        for i in 0..<(self.count - 1) {
+            let startPoint = self[i]
+            let endPoint = self[i + 1]
+            
+            // P0: startPoint.end (始点アンカー)
+            // P1: startPoint.endControl (始点から伸びるハンドル)
+            // P2: endPoint.startControl (終点に向かうハンドル)
+            // P3: endPoint.end (終点アンカー)
+            let list: [SIMD3<Float>] = [
+                startPoint.end,
+                startPoint.endControl,
+                endPoint.startControl,
+                endPoint.end
+            ].compactMap { $0 }
+            
+            // 4つの点が揃っている場合のみセグメントとして追加する
+            if list.count == 4 {
+                beziers.append(list)
+            }
+        }
+        
+        return beziers
+    }
+}
+
+extension [[SIMD3<Float>]] {
+    /// ベジェのセグメント [firstPoint, ctrl1, ctrl2, lastPoint] を制御点のデータに変換する
+    func toBezierPointData(strokeId: UUID) -> [BezierPointData] {
+        // 4点ない場合は消す
+        if self.count < 3 {
+            return []
+        }
+        
+        guard let end = self.first?[0],
+              let endControl = self.first?[1] else { return [] }
+        
+        var startPoint = BezierPointData(uuid: UUID(), strokeId: strokeId)
+        startPoint.add(point: end, pn: .end)
+        startPoint.add(point: endControl, pn: .endControl)
+        
+        var bezierPoints: [BezierPointData] = [startPoint]
+        
+        for points in self {
+            var bezierPoint = BezierPointData(uuid: UUID(), strokeId: strokeId)
+            bezierPoint.add(point: points[3], pn: .end)
+            bezierPoint.add(point: points[2], pn: .startControl)
+            
+            bezierPoints.append(bezierPoint)
+        }
+        return bezierPoints
     }
 }
 

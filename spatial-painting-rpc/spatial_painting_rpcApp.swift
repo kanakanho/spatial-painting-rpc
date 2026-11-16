@@ -11,6 +11,10 @@ import SwiftUI
 struct spatial_painting_rpcApp: App {
     @StateObject private var appModel = AppModel()
     
+    init() {
+        PaintingECS.register()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()

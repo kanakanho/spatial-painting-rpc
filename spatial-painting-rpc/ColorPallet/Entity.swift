@@ -36,8 +36,8 @@ extension ModelEntity {
 
 // MARK: — Entity 拡張
 extension Entity {
-    /// StrokeComponent を持っているかどうか
-    var hasStrokeRootComponent: Bool {
-        components.contains { $0 is StrokeRootComponent }
+    /// ストロークの消しゴム用コライダーかどうか
+    var hasStrokeColliderComponent: Bool {
+        components.has(StrokeColliderComponent.self)
     }
 }

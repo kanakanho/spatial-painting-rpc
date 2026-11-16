@@ -39,7 +39,7 @@ class Painting:ObservableObject {
     }
     
     func addBezierStrokePoints(param: AddBezierStrokePointsParam) {
-        paintingCanvas.addBezierStrokePoints(userId: param.userId, bezierPoints: param.bezierPoints.map { BezierStroke.BezierPoint(data: $0) })
+        paintingCanvas.addBezierStrokePoints(userId: param.userId, bezierPoints: param.bezierPoints)
     }
     
     /// ストロークを終了する
@@ -148,7 +148,7 @@ struct PaintingEntity: RPCEntity {
         struct MoveControlPointParam: Codable {
             let strokeId: UUID
             let controlPointId: UUID
-            let controlType: BezierStroke.BezierPoint.PointType
+            let controlType: BezierPointType
             let newPosition: SIMD3<Float>
         }
         
