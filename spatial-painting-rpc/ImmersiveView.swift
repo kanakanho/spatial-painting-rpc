@@ -155,7 +155,7 @@ struct ImmersiveView: View {
         .task {
             #if !targetEnvironment(simulator)
             do {
-                try await appModel.model.session.run([appModel.model.sceneReconstruction, appModel.model.handTracking])
+                try await appModel.model.session.run([appModel.model.handTracking])
             } catch {
                 print("Failed to start session: \(error)")
                 await dismissImmersiveSpace()
@@ -169,10 +169,6 @@ struct ImmersiveView: View {
         .task(priority: .high) {
             await stylusManager.handleControllerSetup()
             await trackingSession.run(Self.trackingConfiguration())
-        }
-        /// 空間検出の処理を起動
-        .task(priority: .low) {
-            await appModel.model.processReconstructionUpdates()
         }
         /// 指先の球を表示
         .task {

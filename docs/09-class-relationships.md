@@ -79,8 +79,6 @@ ViewModel (AR/VRシーン管理)
 ├── colorPalletModel: AdvancedColorPalletModel
 ├── session: ARKitSession
 ├── handTracking: HandTrackingProvider
-├── sceneReconstruction: SceneReconstructionProvider
-├── meshEntities: [UUID: ModelEntity]
 ├── contentEntity: Entity
 ├── leftHandEntity: Entity
 └── rightHandEntity: Entity

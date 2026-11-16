@@ -150,9 +150,6 @@ class AppModel: ObservableObject {
 .task {
     await appModel.model.processHandUpdates()
 }
-.task(priority: .low) {
-    await appModel.model.processReconstructionUpdates()
-}
 ```
 
 ### ObservableObjectによる状態同期

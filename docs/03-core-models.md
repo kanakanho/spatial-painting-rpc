@@ -139,10 +139,8 @@ class ViewModel {
     // ARKit セッション
     var session = ARKitSession()
     var handTracking = HandTrackingProvider()
-    var sceneReconstruction = SceneReconstructionProvider()
     
     // エンティティ管理
-    private var meshEntities = [UUID: ModelEntity]()
     var contentEntity = Entity()
     var leftHandEntity = Entity()
     var rightHandEntity = Entity()
@@ -168,8 +166,6 @@ class ViewModel {
 | `colorPalletModel` | AdvancedColorPalletModel | カラーパレットとツール管理 |
 | `session` | ARKitSession | ARKitセッション |
 | `handTracking` | HandTrackingProvider | ハンドトラッキング機能 |
-| `sceneReconstruction` | SceneReconstructionProvider | 空間認識機能 |
-| `meshEntities` | [UUID: ModelEntity] | 空間メッシュエンティティの管理 |
 | `contentEntity` | Entity | メインコンテンツエンティティ |
 | `latestHandTracking` | HandsUpdates | 最新のハンドトラッキングデータ |
 | `entitiyOperationLock` | OperationLock | エンティティ操作のロック状態 |
@@ -183,14 +179,9 @@ class ViewModel {
 func processHandUpdates() async
 ```
 
-#### 2. processReconstructionUpdates()
-空間再構築の更新を処理します。
+> **Note:** 以前は `SceneReconstructionProvider` で部屋のメッシュを取得し、物理演算用のコライダーを付けていました。アプリの機能では使っておらず、メッシュの更新のたびに物理形状を作り直す処理が物理演算の遅延とハングの主な原因だったため、削除しました。
 
-```swift
-func processReconstructionUpdates() async
-```
-
-#### 3. showFingerTipSpheres() / dismissFingerTipSpheres()
+#### 2. showFingerTipSpheres() / dismissFingerTipSpheres()
 指先のガイド球の表示・非表示を制御します。
 
 ```swift

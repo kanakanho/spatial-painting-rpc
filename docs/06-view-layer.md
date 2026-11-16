@@ -204,13 +204,6 @@ RealityView { content in
 }
 ```
 
-#### 空間検出処理
-```swift
-.task(priority: .low) {
-    await appModel.model.processReconstructionUpdates()
-}
-```
-
 #### 指先ガイド表示
 ```swift
 .task {
